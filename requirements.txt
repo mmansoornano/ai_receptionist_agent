@@ -37,6 +37,7 @@ python-dotenv>=1.0.0
 pydantic>=2.0.0
 typing-extensions>=4.8.0
 requests>=2.31.0  # For backend API calls
+pyyaml>=6.0.0  # For prompt versioning (YAML files)
 
 # Testing
 pytest>=7.4.0  # For running tests

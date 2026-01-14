@@ -4,23 +4,10 @@ from langchain_core.messages import SystemMessage
 from langgraph.prebuilt import ToolNode
 from config import DEFAULT_LANGUAGE
 from services.llm_service import get_llm_service
+from services.prompt_loader import get_prompt
 from graph.state import ReceptionistState
 from tools.cancellation_tool import CANCELLATION_TOOLS
 from utils.logger import log_agent_flow, log_llm_call
-
-CANCELLATION_SYSTEM_PROMPT = """You are an AI assistant for a protein bar company that helps customers with order cancellations and refunds.
-
-Your tasks:
-1. Greet customers politely in English
-2. Collect the order ID
-3. Ask for the cancellation reason
-4. Submit the cancellation request using submit_order_cancellation tool
-5. Provide customer service contact information for refunds and reimbursements
-
-For refunds and reimbursements, customers need to contact customer service directly.
-Use get_cancellation_contact_info tool to provide the contact number.
-
-Be friendly, professional, and helpful. Always respond to customers in English."""
 
 
 def cancellation_agent(state: ReceptionistState) -> ReceptionistState:
@@ -33,8 +20,9 @@ def cancellation_agent(state: ReceptionistState) -> ReceptionistState:
     messages = state.get("messages", [])
     language = state.get("language", DEFAULT_LANGUAGE)
     
-    # Create system message
-    system_msg = SystemMessage(content=CANCELLATION_SYSTEM_PROMPT)
+    # Get prompt and create system message
+    cancellation_prompt = get_prompt("cancellation_agent")
+    system_msg = SystemMessage(content=cancellation_prompt)
     
     # Prepare messages with system prompt
     agent_messages = [system_msg] + messages

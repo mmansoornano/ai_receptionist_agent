@@ -3,21 +3,9 @@ import time
 from typing import Literal
 from langchain_core.messages import HumanMessage, AIMessage
 from services.llm_service import get_llm_service
+from services.prompt_loader import get_prompt
 from graph.state import ReceptionistState
 from utils.logger import log_agent_flow, log_intent_classification, log_llm_call
-
-
-ROUTER_SYSTEM_PROMPT = """You are an AI assistant that classifies user intent for a protein bar company chatbot.
-
-Analyze the user's message and determine the intent:
-- "product_inquiry": User is asking about products, prices, features, specifications, or product information
-- "ordering": User wants to add items to cart, view cart, update quantities, remove items, or manage shopping cart
-- "payment": User wants to make a payment, checkout, or complete a purchase
-- "cancellation": User wants to cancel an order or get refund/reimbursement information
-- "general_qa": User is asking general questions (anything else)
-
-Respond ONLY with one of these five words: product_inquiry, ordering, payment, cancellation, or general_qa.
-No other text."""
 
 
 def router_agent(state: ReceptionistState) -> ReceptionistState:
@@ -40,7 +28,8 @@ def router_agent(state: ReceptionistState) -> ReceptionistState:
     llm_service = get_llm_service()
     llm = llm_service.get_llm(temperature=0)
     
-    classification_prompt = f"{ROUTER_SYSTEM_PROMPT}\n\nUser message: {last_message.content}"
+    router_prompt = get_prompt("router")
+    classification_prompt = f"{router_prompt}\n\nUser message: {last_message.content}"
     
     log_llm_call(llm_service.provider_name, llm_service.model_name, "Intent Classification")
     response = llm.invoke([HumanMessage(content=classification_prompt)])
