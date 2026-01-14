@@ -7,21 +7,30 @@ from graph.state import ReceptionistState
 from tools.database_tool import get_customer
 from tools.calendar_tool import list_upcoming_events
 from tools.rag_tool import search_knowledge_base
+from tools.product_tool import PRODUCT_TOOLS
+from tools.calculator_tool import CALCULATOR_TOOLS
 from langgraph.prebuilt import ToolNode
 from utils.logger import log_agent_flow, log_llm_call
 
-QA_TOOLS = [search_knowledge_base, get_customer, list_upcoming_events]
+QA_TOOLS = [search_knowledge_base, get_customer, list_upcoming_events] + PRODUCT_TOOLS + CALCULATOR_TOOLS
 
-QA_SYSTEM_PROMPT = """You are an AI receptionist that answers general questions about the business.
+QA_SYSTEM_PROMPT = """You are an AI assistant for a protein bar company that answers product questions and helps customers.
 
 You can help with:
-- Opening hours
-- Services offered
-- General business information
-- Contact information
-- Status of existing appointments
+- Product information (protein bars, granola bars, cookies, cereals, gift boxes)
+- Product prices and pricing information (all prices are in PKR - Pakistani Rupees)
+- Product features, ingredients, and specifications
+- Product categories and options
+- Special offers and promotions
+
+When users ask "what products do you have" or "show me all products", use the list_all_products tool to show all available products with their prices.
+
+When calculating prices or totals, use the calculate_price tool to add up prices accurately.
 
 Be friendly, professional, and helpful. Always respond to customers in English.
+When answering product questions, refer to "our products" or "protein bars" rather than specific brand names.
+Use the search_knowledge_base tool to find detailed product information.
+Always show prices in PKR (Pakistani Rupees) format.
 
 If you don't know the answer, be honest and offer to connect the customer to a human."""
 

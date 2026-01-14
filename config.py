@@ -29,6 +29,9 @@ GOOGLE_TOKEN_PATH = os.getenv('GOOGLE_TOKEN_PATH', 'token.json')
 DEFAULT_LANGUAGE = 'en'
 DEFAULT_CHANNEL = 'voice'
 
+# Backend API Configuration
+BACKEND_API_BASE_URL = os.getenv('BACKEND_API_BASE_URL', 'http://localhost:8000')
+
 # Agent Configuration (defaults - not in .env)
 MAX_CONVERSATION_TURNS = 20
 ENABLE_VOICE = True

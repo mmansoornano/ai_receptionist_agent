@@ -1,10 +1,10 @@
 """Main LangGraph graph orchestration."""
 from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
 from graph.state import ReceptionistState
 from graph.router import router_agent, route_to_agent
-from graph.booking_agent import booking_agent, booking_tool_node
 from graph.qa_agent import qa_agent, qa_tool_node
+from graph.ordering_agent import ordering_agent, ordering_tool_node
+from graph.payment_agent import payment_agent, payment_tool_node
 from graph.cancellation_agent import cancellation_agent, cancellation_tool_node
 from langchain_core.messages import AIMessage
 
@@ -29,7 +29,7 @@ def call_tools(state: ReceptionistState) -> ReceptionistState:
     """Route to appropriate tool node based on intent."""
     from utils.logger import log_agent_flow
     
-    intent = state.get("intent", "question")
+    intent = state.get("intent", "general_qa")
     messages = state.get("messages", [])
     
     # Check for tool calls in last message
@@ -44,15 +44,19 @@ def call_tools(state: ReceptionistState) -> ReceptionistState:
         "tools": tool_calls
     })
     
-    if intent == "booking":
-        result = booking_tool_node.invoke(state)
-        log_agent_flow("TOOLS", "Booking Tools Executed")
+    if intent == "ordering" and ordering_tool_node:
+        result = ordering_tool_node.invoke(state)
+        log_agent_flow("TOOLS", "Ordering Tools Executed")
         return result
-    elif intent == "cancellation":
+    elif intent == "payment" and payment_tool_node:
+        result = payment_tool_node.invoke(state)
+        log_agent_flow("TOOLS", "Payment Tools Executed")
+        return result
+    elif intent == "cancellation" and cancellation_tool_node:
         result = cancellation_tool_node.invoke(state)
         log_agent_flow("TOOLS", "Cancellation Tools Executed")
         return result
-    elif qa_tool_node:
+    elif (intent == "product_inquiry" or intent == "general_qa") and qa_tool_node:
         result = qa_tool_node.invoke(state)
         log_agent_flow("TOOLS", "QA Tools Executed")
         return result
@@ -69,8 +73,9 @@ def create_receptionist_graph():
     
     # Add nodes
     workflow.add_node("router", router_agent)
-    workflow.add_node("booking_agent", booking_agent)
     workflow.add_node("qa_agent", qa_agent)
+    workflow.add_node("ordering_agent", ordering_agent)
+    workflow.add_node("payment_agent", payment_agent)
     workflow.add_node("cancellation_agent", cancellation_agent)
     workflow.add_node("tools", call_tools)
     
@@ -80,14 +85,15 @@ def create_receptionist_graph():
         "router",
         route_to_agent,
         {
-            "booking_agent": "booking_agent",
             "qa_agent": "qa_agent",
+            "ordering_agent": "ordering_agent",
+            "payment_agent": "payment_agent",
             "cancellation_agent": "cancellation_agent",
         }
     )
     
     # Add conditional edges for each agent
-    for agent_name in ["booking_agent", "qa_agent", "cancellation_agent"]:
+    for agent_name in ["qa_agent", "ordering_agent", "payment_agent", "cancellation_agent"]:
         workflow.add_conditional_edges(
             agent_name,
             should_continue,
@@ -100,9 +106,11 @@ def create_receptionist_graph():
     # After tools, continue back to the agent
     def route_after_tools(state: ReceptionistState) -> str:
         """Route back to agent after tools."""
-        intent = state.get("intent", "question")
-        if intent == "booking":
-            return "booking_agent"
+        intent = state.get("intent", "general_qa")
+        if intent == "ordering":
+            return "ordering_agent"
+        elif intent == "payment":
+            return "payment_agent"
         elif intent == "cancellation":
             return "cancellation_agent"
         else:
@@ -112,9 +120,10 @@ def create_receptionist_graph():
         "tools",
         route_after_tools,
         {
-            "booking_agent": "booking_agent",
-            "cancellation_agent": "cancellation_agent",
             "qa_agent": "qa_agent",
+            "ordering_agent": "ordering_agent",
+            "payment_agent": "payment_agent",
+            "cancellation_agent": "cancellation_agent",
         }
     )
     

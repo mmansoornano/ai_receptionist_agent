@@ -1,40 +1,33 @@
-"""Cancellation agent for handling appointment cancellations."""
+"""Cancellation agent for handling order cancellations."""
 import time
 from langchain_core.messages import SystemMessage
 from langgraph.prebuilt import ToolNode
 from config import DEFAULT_LANGUAGE
 from services.llm_service import get_llm_service
 from graph.state import ReceptionistState
-from tools.calendar_tool import cancel_calendar_event
-from tools.database_tool import find_appointment_by_customer, cancel_appointment
-from tools.notification_tool import send_cancellation_notification
+from tools.cancellation_tool import CANCELLATION_TOOLS
 from utils.logger import log_agent_flow, log_llm_call
 
-# Combine tools for cancellation agent
-CANCELLATION_TOOLS = [
-    find_appointment_by_customer,
-    cancel_appointment,
-    cancel_calendar_event,
-    send_cancellation_notification,
-]
-
-CANCELLATION_SYSTEM_PROMPT = """You are an AI receptionist that helps customers cancel appointments.
+CANCELLATION_SYSTEM_PROMPT = """You are an AI assistant for a protein bar company that helps customers with order cancellations and refunds.
 
 Your tasks:
-1. Verify customer identity (phone number)
-2. Find the customer's appointments
-3. Confirm which appointment should be cancelled
-4. Cancel in the calendar and database
-5. Send cancellation confirmation via email and SMS
+1. Greet customers politely in English
+2. Collect the order ID
+3. Ask for the cancellation reason
+4. Submit the cancellation request using submit_order_cancellation tool
+5. Provide customer service contact information for refunds and reimbursements
+
+For refunds and reimbursements, customers need to contact customer service directly.
+Use get_cancellation_contact_info tool to provide the contact number.
 
 Be friendly, professional, and helpful. Always respond to customers in English."""
 
 
 def cancellation_agent(state: ReceptionistState) -> ReceptionistState:
-    """Cancellation agent that handles appointment cancellations."""
+    """Cancellation agent that handles order cancellations."""
     log_agent_flow("CANCELLATION", "Agent Invoked", {
-        "tools_count": len(CANCELLATION_TOOLS),
-        "tools": [tool.name for tool in CANCELLATION_TOOLS]
+        "tools_count": len(CANCELLATION_TOOLS) if CANCELLATION_TOOLS else 0,
+        "tools": [tool.name for tool in CANCELLATION_TOOLS] if CANCELLATION_TOOLS else []
     })
     
     messages = state.get("messages", [])
@@ -51,8 +44,8 @@ def cancellation_agent(state: ReceptionistState) -> ReceptionistState:
     llm_service = get_llm_service()
     llm = llm_service.get_llm(temperature=0.7)
     
-    # Bind tools to LLM (if supported)
-    if llm_service.supports_tools():
+    # Bind tools to LLM (if supported and tools available)
+    if llm_service.supports_tools() and CANCELLATION_TOOLS:
         llm_with_tools = llm.bind_tools(CANCELLATION_TOOLS)
         log_agent_flow("CANCELLATION", "LLM with Tools", {"tools_bound": True})
     else:
@@ -79,4 +72,4 @@ def cancellation_agent(state: ReceptionistState) -> ReceptionistState:
 
 
 # Create tool node for executing tools
-cancellation_tool_node = ToolNode(CANCELLATION_TOOLS)
+cancellation_tool_node = ToolNode(CANCELLATION_TOOLS) if CANCELLATION_TOOLS else None

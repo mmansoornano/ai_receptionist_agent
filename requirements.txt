@@ -36,3 +36,7 @@ uvicorn>=0.24.0  # ASGI server for FastAPI
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 typing-extensions>=4.8.0
+requests>=2.31.0  # For backend API calls
+
+# Testing
+pytest>=7.4.0  # For running tests

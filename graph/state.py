@@ -7,9 +7,11 @@ from langgraph.graph.message import add_messages
 class ReceptionistState(TypedDict):
     """State for the receptionist multi-agent system."""
     messages: Annotated[Sequence[BaseMessage], add_messages]
-    intent: Optional[str]  # "booking", "cancellation", "question"
+    intent: Optional[str]  # "product_inquiry", "ordering", "payment", "cancellation", "general_qa"
     customer_info: Optional[Dict]
-    appointment_data: Optional[Dict]
+    cart_data: Optional[Dict]  # Shopping cart data
+    order_data: Optional[Dict]  # Order data
+    payment_data: Optional[Dict]  # Payment data
     channel: str  # "voice" or "sms"
     language: str  # "en" (English)
     conversation_id: Optional[str]

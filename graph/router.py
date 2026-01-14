@@ -7,14 +7,16 @@ from graph.state import ReceptionistState
 from utils.logger import log_agent_flow, log_intent_classification, log_llm_call
 
 
-ROUTER_SYSTEM_PROMPT = """You are an AI receptionist that classifies user intent.
+ROUTER_SYSTEM_PROMPT = """You are an AI assistant that classifies user intent for a protein bar company chatbot.
 
 Analyze the user's message and determine the intent:
-- "booking": User wants to book an appointment
-- "cancellation": User wants to cancel an appointment
-- "question": User is asking a general question
+- "product_inquiry": User is asking about products, prices, features, specifications, or product information
+- "ordering": User wants to add items to cart, view cart, update quantities, remove items, or manage shopping cart
+- "payment": User wants to make a payment, checkout, or complete a purchase
+- "cancellation": User wants to cancel an order or get refund/reimbursement information
+- "general_qa": User is asking general questions (anything else)
 
-Respond ONLY with one of these three words: booking, cancellation, or question.
+Respond ONLY with one of these five words: product_inquiry, ordering, payment, cancellation, or general_qa.
 No other text."""
 
 
@@ -24,14 +26,14 @@ def router_agent(state: ReceptionistState) -> ReceptionistState:
     
     messages = state.get("messages", [])
     if not messages:
-        log_intent_classification("question", "default (no messages)")
-        return {**state, "intent": "question"}
+        log_intent_classification("general_qa", "default (no messages)")
+        return {**state, "intent": "general_qa"}
     
     # Get the last user message
     last_message = messages[-1]
     if not isinstance(last_message, HumanMessage):
-        log_intent_classification("question", "default (not HumanMessage)")
-        return {**state, "intent": "question"}
+        log_intent_classification("general_qa", "default (not HumanMessage)")
+        return {**state, "intent": "general_qa"}
     
     # Use LLM to classify intent
     start_time = time.time()
@@ -48,9 +50,10 @@ def router_agent(state: ReceptionistState) -> ReceptionistState:
     intent = response.content.strip().lower()
     
     # Validate intent
-    if intent not in ["booking", "cancellation", "question"]:
-        log_intent_classification("question", f"default (invalid: {intent})")
-        intent = "question"  # Default to question if unclear
+    valid_intents = ["product_inquiry", "ordering", "payment", "cancellation", "general_qa"]
+    if intent not in valid_intents:
+        log_intent_classification("general_qa", f"default (invalid: {intent})")
+        intent = "general_qa"  # Default to general_qa if unclear
     else:
         log_intent_classification(intent, "valid")
     
@@ -58,16 +61,22 @@ def router_agent(state: ReceptionistState) -> ReceptionistState:
     return {**state, "intent": intent}
 
 
-def route_to_agent(state: ReceptionistState) -> Literal["booking_agent", "qa_agent", "cancellation_agent"]:
+def route_to_agent(state: ReceptionistState) -> Literal["qa_agent", "ordering_agent", "payment_agent", "cancellation_agent"]:
     """Route to appropriate agent based on intent."""
-    intent = state.get("intent", "question")
+    intent = state.get("intent", "general_qa")
     
-    if intent == "booking":
-        log_agent_flow("ROUTER", "Routing to Booking Agent")
-        return "booking_agent"
+    if intent == "product_inquiry" or intent == "general_qa":
+        log_agent_flow("ROUTER", "Routing to QA Agent")
+        return "qa_agent"
+    elif intent == "ordering":
+        log_agent_flow("ROUTER", "Routing to Ordering Agent")
+        return "ordering_agent"
+    elif intent == "payment":
+        log_agent_flow("ROUTER", "Routing to Payment Agent")
+        return "payment_agent"
     elif intent == "cancellation":
         log_agent_flow("ROUTER", "Routing to Cancellation Agent")
         return "cancellation_agent"
     else:
-        log_agent_flow("ROUTER", "Routing to QA Agent")
+        log_agent_flow("ROUTER", "Routing to QA Agent (default)")
         return "qa_agent"
