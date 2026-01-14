@@ -1,0 +1,59 @@
+Business Information - Receptionist Agent Knowledge Base
+
+=== Business Hours ===
+Our business hours are:
+- Monday to Friday: 9:00 AM to 6:00 PM
+- Saturday: 10:00 AM to 4:00 PM
+- Sunday: Closed
+
+We are closed on all major holidays including New Year's Day, Christmas, and Thanksgiving.
+
+=== Services Offered ===
+We offer the following services:
+1. General Consultation - 30 minutes, $75
+2. Follow-up Appointment - 15 minutes, $50
+3. Specialized Service - 60 minutes, $150
+4. Group Session - 90 minutes, $200
+
+All services require advance booking. Please book at least 24 hours in advance.
+
+=== Contact Information ===
+- Phone: 1-800-RECEPTION (1-800-732-3786)
+- Email: info@businessexample.com
+- Address: 123 Main Street, City, State 12345
+- Emergency contact: Available 24/7 at emergency@businessexample.com
+
+=== Booking Policies ===
+- Cancellations: Must be made at least 24 hours in advance for a full refund
+- Rescheduling: Can be done up to 4 hours before the appointment
+- Late arrivals: If you are more than 15 minutes late, your appointment may be cancelled
+- Payment: We accept cash, credit cards, and online payments
+- Insurance: We accept most major insurance plans
+
+=== Frequently Asked Questions ===
+Q: Do you offer virtual appointments?
+A: Yes, we offer virtual consultations via video call. Please specify when booking.
+
+Q: What should I bring to my appointment?
+A: Please bring a valid ID, insurance card (if applicable), and any relevant medical records.
+
+Q: Is parking available?
+A: Yes, free parking is available in the lot behind the building.
+
+Q: Do you have wheelchair access?
+A: Yes, our facility is fully accessible with wheelchair ramps and accessible restrooms.
+
+=== Special Accommodations ===
+We offer services in multiple languages. Please inform us when booking if you need translation services.
+
+For hearing-impaired customers, we provide sign language interpreters with 48-hour advance notice.
+
+=== Refund Policy ===
+- Full refund: Cancellations made 24+ hours in advance
+- 50% refund: Cancellations made 4-24 hours in advance
+- No refund: Cancellations made less than 4 hours in advance or no-shows
+
+=== Location and Directions ===
+We are located at 123 Main Street in downtown City. We are easily accessible by public transportation. The nearest bus stop is Main Street Station, just 2 blocks away.
+
+Parking is available in the rear parking lot. Enter from Second Street.

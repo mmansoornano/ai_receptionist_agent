@@ -1,0 +1,38 @@
+# LangGraph & LangChain
+langgraph>=0.2.0
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-ollama>=0.1.0
+langchain-core>=0.1.0
+
+# LLM Providers
+openai>=1.0.0
+
+# Google Calendar API
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
+
+# Note: Voice processing (STT/TTS) has been moved to backend
+# Agent no longer requires voice dependencies
+
+# Django (required for database_tool and notification_tool)
+# Note: Agent tools use Django ORM to access database directly
+# Future: Could refactor to call backend REST API instead
+django>=4.2.0
+djangorestframework>=3.14.0  # Required for rest_framework app in INSTALLED_APPS
+django-filter>=23.0  # Required for django_filters app in INSTALLED_APPS
+django-cors-headers>=4.3.0  # Required for corsheaders app in INSTALLED_APPS
+
+# Notifications
+twilio>=8.10.0  # Required for notification_tool (SMS)
+
+# API Server
+fastapi>=0.104.0  # For agent API server
+uvicorn>=0.24.0  # ASGI server for FastAPI
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+typing-extensions>=4.8.0
