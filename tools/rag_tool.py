@@ -36,7 +36,7 @@ def search_knowledge_base(query: str) -> str:
         else:
             result = "Relevant information:\n\n" + "\n\n---\n\n".join(chunks)
         
-        log_tool_call("search_knowledge_base", {"query": query}, result[:200])
+        log_tool_call("search_knowledge_base", {"query": query}, result)
         return result
     except Exception as e:
         result = f"Error searching knowledge base: {str(e)}"

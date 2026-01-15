@@ -24,6 +24,7 @@ def test_agent_flow():
     state1: ReceptionistState = {
         "messages": [HumanMessage(content="What is the price of protein bars?")],
         "intent": None,
+        "conversation_context": None,
         "customer_info": None,
         "cart_data": None,
         "order_data": None,
@@ -49,6 +50,7 @@ def test_agent_flow():
     state2: ReceptionistState = {
         "messages": [HumanMessage(content="Add 2 white chocolate protein bars to my cart")],
         "intent": None,
+        "conversation_context": None,
         "customer_info": None,
         "cart_data": None,
         "order_data": None,
@@ -74,6 +76,7 @@ def test_agent_flow():
     state3: ReceptionistState = {
         "messages": [HumanMessage(content="Show me my cart")],
         "intent": None,
+        "conversation_context": None,
         "customer_info": None,
         "cart_data": None,
         "order_data": None,

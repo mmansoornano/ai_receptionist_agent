@@ -53,6 +53,7 @@ def process_message(
         initial_state: ReceptionistState = {
             "messages": [HumanMessage(content=message)],
             "intent": None,
+            "conversation_context": None,
             "customer_info": None,
             "appointment_data": None,
             "channel": channel,

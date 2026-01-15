@@ -8,6 +8,7 @@ class ReceptionistState(TypedDict):
     """State for the receptionist multi-agent system."""
     messages: Annotated[Sequence[BaseMessage], add_messages]
     intent: Optional[str]  # "product_inquiry", "ordering", "payment", "cancellation", "general_qa"
+    conversation_context: Optional[str]  # Summary or key context from conversation history for efficient memory
     customer_info: Optional[Dict]
     cart_data: Optional[Dict]  # Shopping cart data
     order_data: Optional[Dict]  # Order data
