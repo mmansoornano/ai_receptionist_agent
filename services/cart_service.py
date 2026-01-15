@@ -18,13 +18,13 @@ def _make_request(method: str, endpoint: str, **kwargs) -> Dict:
 
 
 def add_to_cart(customer_id: str, product_id: str, quantity: int = 1) -> Dict:
-    """Add item to cart (POST /api/cart/add)."""
+    """Add item to cart (POST /api/cart/add/)."""
     log_tool_call("cart_add_item", {"customer_id": customer_id, "product_id": product_id, "quantity": quantity})
     
     try:
         result = _make_request(
             "POST",
-            "/api/cart/add",
+            "/api/cart/add/",
             json={
                 "product_id": product_id,
                 "quantity": quantity,
@@ -40,13 +40,13 @@ def add_to_cart(customer_id: str, product_id: str, quantity: int = 1) -> Dict:
 
 
 def get_cart(customer_id: str = "anonymous") -> Dict:
-    """Get cart contents (GET /api/cart)."""
+    """Get cart contents (GET /api/cart/)."""
     log_tool_call("cart_get", {"customer_id": customer_id})
     
     try:
         result = _make_request(
             "GET",
-            "/api/cart",
+            "/api/cart/",
             params={"customer_id": customer_id}
         )
         log_tool_call("cart_get", {"customer_id": customer_id}, result)
@@ -58,13 +58,13 @@ def get_cart(customer_id: str = "anonymous") -> Dict:
 
 
 def update_cart_item(item_id: str, quantity: int, customer_id: str = "anonymous") -> Dict:
-    """Update cart item quantity (PUT /api/cart/item/:id)."""
+    """Update cart item quantity (PUT /api/cart/item/:id/)."""
     log_tool_call("cart_update_item", {"item_id": item_id, "quantity": quantity, "customer_id": customer_id})
     
     try:
         result = _make_request(
             "PUT",
-            f"/api/cart/item/{item_id}",
+            f"/api/cart/item/{item_id}/",
             json={
                 "quantity": quantity,
                 "customer_id": customer_id
@@ -79,13 +79,13 @@ def update_cart_item(item_id: str, quantity: int, customer_id: str = "anonymous"
 
 
 def remove_from_cart(item_id: str, customer_id: str = "anonymous") -> Dict:
-    """Remove item from cart (DELETE /api/cart/item/:id)."""
+    """Remove item from cart (DELETE /api/cart/item/:id/)."""
     log_tool_call("cart_remove_item", {"item_id": item_id, "customer_id": customer_id})
     
     try:
         result = _make_request(
             "DELETE",
-            f"/api/cart/item/{item_id}",
+            f"/api/cart/item/{item_id}/",
             params={"customer_id": customer_id}
         )
         log_tool_call("cart_remove_item", {"item_id": item_id, "customer_id": customer_id}, result)
@@ -97,13 +97,13 @@ def remove_from_cart(item_id: str, customer_id: str = "anonymous") -> Dict:
 
 
 def clear_cart(customer_id: str = "anonymous") -> Dict:
-    """Clear entire cart (DELETE /api/cart)."""
+    """Clear entire cart (DELETE /api/cart/)."""
     log_tool_call("cart_clear", {"customer_id": customer_id})
     
     try:
         result = _make_request(
             "DELETE",
-            "/api/cart",
+            "/api/cart/",
             params={"customer_id": customer_id}
         )
         log_tool_call("cart_clear", {"customer_id": customer_id}, result)

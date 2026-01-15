@@ -21,13 +21,13 @@ def _make_request(method: str, endpoint: str, **kwargs) -> Dict:
 
 
 def send_otp(mobile_number: str) -> Dict:
-    """Send OTP to mobile number (POST /api/payment/otp/send)."""
+    """Send OTP to mobile number (POST /api/payment/otp/send/)."""
     log_tool_call("payment_send_otp", {"mobile_number": mobile_number})
     
     try:
         result = _make_request(
             "POST",
-            "/api/payment/otp/send",
+            "/api/payment/otp/send/",
             json={"mobile_number": mobile_number}
         )
         log_tool_call("payment_send_otp", {"mobile_number": mobile_number}, result)
@@ -39,13 +39,13 @@ def send_otp(mobile_number: str) -> Dict:
 
 
 def verify_otp(mobile_number: str, otp: str) -> Dict:
-    """Verify OTP (POST /api/payment/otp/verify)."""
+    """Verify OTP (POST /api/payment/otp/verify/)."""
     log_tool_call("payment_verify_otp", {"mobile_number": mobile_number, "otp": otp})
     
     try:
         result = _make_request(
             "POST",
-            "/api/payment/otp/verify",
+            "/api/payment/otp/verify/",
             json={
                 "mobile_number": mobile_number,
                 "otp": otp
@@ -60,7 +60,7 @@ def verify_otp(mobile_number: str, otp: str) -> Dict:
 
 
 def confirm_payment(mobile_number: str, amount: float, order_id: Optional[str] = None) -> Dict:
-    """Confirm payment via Easypaisa (POST /api/payment/easypaisa/confirm)."""
+    """Confirm payment via Easypaisa (POST /api/payment/easypaisa/confirm/)."""
     log_tool_call("payment_confirm", {"mobile_number": mobile_number, "amount": amount, "order_id": order_id})
     
     try:
@@ -73,7 +73,7 @@ def confirm_payment(mobile_number: str, amount: float, order_id: Optional[str] =
         
         result = _make_request(
             "POST",
-            "/api/payment/easypaisa/confirm",
+            "/api/payment/easypaisa/confirm/",
             json=payload
         )
         log_tool_call("payment_confirm", {"mobile_number": mobile_number, "amount": amount}, result)
@@ -85,13 +85,13 @@ def confirm_payment(mobile_number: str, amount: float, order_id: Optional[str] =
 
 
 def create_order(cart_data: Dict, transaction_id: str) -> Dict:
-    """Create order after payment (POST /api/orders/create)."""
+    """Create order after payment (POST /api/orders/create/)."""
     log_tool_call("order_create", {"transaction_id": transaction_id})
     
     try:
         result = _make_request(
             "POST",
-            "/api/orders/create",
+            "/api/orders/create/",
             json={
                 "cart_data": cart_data,
                 "transaction_id": transaction_id
