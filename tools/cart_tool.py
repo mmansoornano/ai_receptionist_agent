@@ -7,6 +7,7 @@ from services.cart_service import (
     remove_from_cart,
     clear_cart
 )
+from services.customer_service import update_delivery_address
 from utils.logger import log_tool_call
 
 
@@ -151,11 +152,35 @@ def clear_shopping_cart(customer_id: str = "anonymous") -> str:
         return error_msg
 
 
+@tool
+def set_delivery_address(customer_id: str, delivery_address: str, phone: str = "") -> str:
+    """Save delivery address for the customer.
+    
+    Args:
+        customer_id: Customer ID
+        delivery_address: Full delivery address
+        phone: Optional phone number if customer_id is unknown
+    
+    Returns:
+        Success message
+    """
+    log_tool_call("set_delivery_address", {"customer_id": customer_id, "phone": phone})
+    
+    result = update_delivery_address(customer_id, delivery_address, phone or None)
+    
+    if result.get("success"):
+        return "Delivery address saved successfully."
+    error_msg = f"Error: {result.get('error', 'Unknown error')}"
+    log_tool_call("set_delivery_address", {"customer_id": customer_id, "phone": phone}, error_msg)
+    return error_msg
+
+
 # Export tools list
 CART_TOOLS = [
     add_item_to_cart,
     view_cart,
     update_cart_quantity,
     remove_item_from_cart,
-    clear_shopping_cart
+    clear_shopping_cart,
+    set_delivery_address
 ]

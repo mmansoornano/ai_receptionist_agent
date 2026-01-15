@@ -22,6 +22,9 @@ def ordering_agent(state: ReceptionistState) -> ReceptionistState:
     
     # Get prompt and create system message
     ordering_prompt = get_prompt("ordering_agent")
+    customer_id = state.get("customer_id")
+    if customer_id:
+        ordering_prompt += f"\n\nCustomer ID: {customer_id}\nAlways pass this customer_id to cart or address tools."
     system_msg = SystemMessage(content=ordering_prompt)
     
     # Prepare messages with system prompt
