@@ -17,6 +17,25 @@ def _make_request(method: str, endpoint: str, **kwargs) -> Dict:
         raise
 
 
+def get_customer(customer_id: str) -> Dict:
+    """Get customer information by customer_id (GET /api/customers/{id}/)."""
+    log_tool_call("customer_get", {"customer_id": customer_id})
+    
+    try:
+        # Try to get customer by user_id first (customer_id is usually user.id)
+        # If that fails, try as direct customer ID
+        result = _make_request(
+            "GET",
+            f"/api/customers/{customer_id}/"
+        )
+        log_tool_call("customer_get", {"customer_id": customer_id}, result)
+        return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_tool_call("customer_get", {"customer_id": customer_id}, error_result)
+        return error_result
+
+
 def update_delivery_address(customer_id: Optional[str], delivery_address: str, phone: Optional[str] = None) -> Dict:
     """Update delivery address (POST /api/customers/address)."""
     payload = {

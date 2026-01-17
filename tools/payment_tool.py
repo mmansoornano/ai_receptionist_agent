@@ -5,9 +5,11 @@ from services.payment_service import (
     verify_otp,
     confirm_payment,
     create_order,
+    create_simple_payment,
     get_customer_service_phone
 )
 from services.cart_service import get_cart
+from services.customer_service import get_customer
 from utils.logger import log_tool_call
 
 
@@ -154,9 +156,10 @@ def process_payment(customer_id: str = "anonymous") -> str:
     
     Call this tool AFTER providing the payment link to the user. It will:
     1. Wait 2 seconds to simulate payment processing
-    2. Automatically confirm the payment
-    3. Create the order
-    4. Return confirmation that payment was received and order has been placed
+    2. Get cart and customer information
+    3. Create a Payment record with status=confirmed
+    4. Create the Order linked to the Payment
+    5. Return confirmation that payment was received and order has been placed
     
     Args:
         customer_id: Customer ID (default: "anonymous")
@@ -165,43 +168,67 @@ def process_payment(customer_id: str = "anonymous") -> str:
         Confirmation message that payment was received and order has been placed
     """
     import time
+    import uuid
     log_tool_call("process_payment", {"customer_id": customer_id})
     
     # Simulate payment processing delay (2 seconds)
-    time.sleep(2)
+    # time.sleep(2)
     
     # Get cart to create order
     cart_result = get_cart(customer_id)
     
-    if cart_result.get("success") and cart_result.get("cart"):
-        cart = cart_result["cart"]
-        items = cart.get("items", [])
-        total = cart.get("total", 0)
-        
-        # Generate a dummy transaction ID
-        import uuid
-        transaction_id = str(uuid.uuid4())[:8]
-        
-        # Create order from cart
-        cart_data = {
-            "items": items,
-            "total": total,
-            "customer_id": customer_id
-        }
-        
-        order_result = create_order(cart_data, transaction_id)
-        
-        if order_result.get("success"):
-            order = order_result.get("order", {})
-            message = f"✅ Payment received successfully! Your order has been placed.\n\nOrder ID: {order.get('order_id', transaction_id)}\nTotal Amount: Rs.{total + 150:.2f} (including Rs.150 delivery charge)\n\nThank you for your purchase!"
-            log_tool_call("process_payment", {"customer_id": customer_id, "transaction_id": transaction_id}, message)
-            return message
-        else:
-            error_msg = f"Payment processed but order creation failed: {order_result.get('error', 'Unknown error')}"
-            log_tool_call("process_payment", {"customer_id": customer_id}, error_msg)
-            return error_msg
-    else:
+    if not cart_result.get("success") or not cart_result.get("cart"):
         error_msg = f"Payment processing failed: Could not fetch cart data. {cart_result.get('error', 'Cart is empty or not found')}"
+        log_tool_call("process_payment", {"customer_id": customer_id}, error_msg)
+        return error_msg
+    
+    cart = cart_result["cart"]
+    items = cart.get("items", [])
+    total = cart.get("total", 0)
+    total_with_delivery = total + 150  # Delivery fee
+    
+    # Get customer information to get phone number
+    mobile_number = "03001234567"  # Default phone number
+    if customer_id and customer_id != "anonymous":
+        try:
+            customer_info = get_customer(customer_id)
+            if customer_info.get("phone"):
+                mobile_number = customer_info["phone"]
+        except Exception as e:
+            log_tool_call("process_payment", {"customer_id": customer_id}, f"Warning: Could not fetch customer info: {e}")
+    
+    # Generate a transaction ID
+    transaction_id = f"EP{uuid.uuid4().hex[:8].upper()}"
+    
+    # Create Payment record first
+    payment_result = create_simple_payment(
+        mobile_number=mobile_number,
+        amount=float(total_with_delivery),
+        transaction_id=transaction_id,
+        customer_id=customer_id
+    )
+    
+    if not payment_result.get("success"):
+        error_msg = f"Payment processing failed: Could not create payment record. {payment_result.get('error', 'Unknown error')}"
+        log_tool_call("process_payment", {"customer_id": customer_id}, error_msg)
+        return error_msg
+    
+    # Create order from cart (with same transaction_id so backend can link them)
+    cart_data = {
+        "items": items,
+        "total": total,
+        "customer_id": customer_id
+    }
+    
+    order_result = create_order(cart_data, transaction_id)
+    
+    if order_result.get("success"):
+        order = order_result.get("order", {})
+        message = f"✅ Payment received successfully! Your order has been placed.\n\nOrder ID: {order.get('order_id', transaction_id)}\nTotal Amount: Rs.{total_with_delivery:.2f} (including Rs.150 delivery charge)\n\nThank you for your purchase!"
+        log_tool_call("process_payment", {"customer_id": customer_id, "transaction_id": transaction_id}, message)
+        return message
+    else:
+        error_msg = f"Payment processed but order creation failed: {order_result.get('error', 'Unknown error')}"
         log_tool_call("process_payment", {"customer_id": customer_id}, error_msg)
         return error_msg
 
