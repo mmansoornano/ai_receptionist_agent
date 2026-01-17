@@ -12,6 +12,9 @@ from tools.cancellation_tool import CANCELLATION_TOOLS
 from utils.logger import log_agent_flow, log_llm_call, log_prompt, log_graph_flow
 from utils.conversation_history import format_conversation_history
 from utils.message_utils import create_message_update_command
+from utils.message_filtering import filter_messages_for_agent, get_last_human_message
+from utils.llm_retry import invoke_with_retry
+from utils.error_handler import handle_llm_error
 
 
 def cancellation_agent(state: ReceptionistState) -> Command | ReceptionistState:
@@ -25,13 +28,17 @@ def cancellation_agent(state: ReceptionistState) -> Command | ReceptionistState:
     messages = state.get("messages", [])
     language = state.get("language", DEFAULT_LANGUAGE)
     
+    # Filter messages before processing (excludes ToolMessages and SystemMessages by default)
+    filtered_messages = filter_messages_for_agent(messages, include_system=False, include_tool_results=False)
+    last_human_message = get_last_human_message(messages)
+    
     # Get prompt and create system message
     cancellation_prompt = get_prompt("cancellation_agent")
     
-    # Trim messages for token limits BEFORE formatting history (matches what LLM will see)
+    # Trim messages for token limits AFTER filtering (matches what LLM will see)
     # Remove end_on to preserve AIMessages with tool calls (end_on excludes them)
     trimmed_messages = trim_messages(
-        messages,
+        filtered_messages,  # Use filtered messages instead of raw messages
         strategy="last",
         token_counter=count_tokens_approximately,
         max_tokens=3000,
@@ -73,11 +80,22 @@ def cancellation_agent(state: ReceptionistState) -> Command | ReceptionistState:
         llm_with_tools = llm
         log_agent_flow("CANCELLATION", "LLM without Tools", {"tools_bound": False})
     
-    # Get response from LLM
+    # Get response from LLM with retry logic
     log_llm_call(llm_service.provider_name, llm_service.model_name, "Cancellation Agent")
-    response = llm_with_tools.invoke(agent_messages)
-    response_time = time.time() - start_time
-    log_llm_call(llm_service.provider_name, llm_service.model_name, "Cancellation Agent", response_time)
+    try:
+        response = invoke_with_retry(
+            llm=llm_with_tools,
+            messages=agent_messages,
+            max_retries=3,
+            initial_delay=1.0,
+            agent_name="cancellation_agent"
+        )
+        response_time = time.time() - start_time
+        log_llm_call(llm_service.provider_name, llm_service.model_name, "Cancellation Agent", response_time)
+    except Exception as e:
+        response_time = time.time() - start_time
+        log_llm_call(llm_service.provider_name, llm_service.model_name, "Cancellation Agent", response_time)
+        return handle_llm_error(e, "cancellation_agent", state)
     
     # Check for tool calls
     if hasattr(response, 'tool_calls') and response.tool_calls:

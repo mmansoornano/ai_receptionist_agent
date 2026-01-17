@@ -1,4 +1,5 @@
 """Structured logging utility for the agent system."""
+from ast import List
 import logging
 import sys
 from pathlib import Path
@@ -140,3 +141,8 @@ def log_graph_flow(node_name: str, action: str, details: dict = None):
 def log_conversation_history(conversation_history: str):
     """Log conversation history."""
     agent_logger.info(f"CONVERSATION HISTORY:\n{conversation_history}", extra={'color': False})
+
+
+def log_messages(messages):
+    """Log messages."""
+    agent_logger.info(f"MESSAGES LOG:\n{messages}", extra={'color': False})

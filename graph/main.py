@@ -124,8 +124,11 @@ def create_receptionist_graph():
     # Add initial entry point - only edge needed since Command handles all other routing
     workflow.add_edge(START, "router")
     
-    # Compile graph
-    return workflow.compile()
+    # Compile graph with checkpointer for state persistence between API calls
+    from langgraph.checkpoint.memory import MemorySaver
+    checkpointer = MemorySaver()
+    
+    return workflow.compile(checkpointer=checkpointer)
 
 
 # Create the graph instance

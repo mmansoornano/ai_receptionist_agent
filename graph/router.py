@@ -6,7 +6,7 @@ from langgraph.types import Command
 from services.llm_service import get_llm_service
 from services.prompt_loader import get_prompt
 from graph.state import ReceptionistState
-from utils.logger import log_agent_flow, log_intent_classification, log_llm_call, log_prompt, log_graph_flow
+from utils.logger import log_agent_flow, log_intent_classification, log_llm_call, log_messages, log_prompt, log_graph_flow
 from utils.conversation_history import format_conversation_history
 from utils.message_utils import create_message_update_command
 
@@ -17,6 +17,7 @@ def router_agent(state: ReceptionistState) -> Command | ReceptionistState:
     log_agent_flow("ROUTER", "Starting Intent Classification")
     
     messages = state.get("messages", [])
+    log_messages(messages)
     if not messages:
         log_intent_classification("general_qa", "default (no messages)")
         return Command(
@@ -140,14 +141,17 @@ Based on the current message, classify the intent."""
         # Use Command to update state and end flow
         # add_messages reducer will APPEND greeting_ai_message to existing messages
         # All previous messages (human + AI) are preserved
-        return create_message_update_command(
-            [greeting_ai_message],
-            state=state,
-            goto="__end__",
-            intent="greeting",
-            conversation_context=None,
-            active_agent=None
-        )
+        return Command(
+                update={
+                    "messages": [
+                        greeting_ai_message
+                    ],
+                    "intent": "greeting",
+                    "conversation_context": None,
+                    "active_agent": None
+                },
+                goto="__end__",
+            )
     
     # Otherwise, it's an intent classification
     intent = response_lower

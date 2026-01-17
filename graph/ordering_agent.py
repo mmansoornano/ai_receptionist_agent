@@ -12,6 +12,9 @@ from langgraph.prebuilt import ToolNode
 from utils.logger import log_agent_flow, log_llm_call, log_prompt, log_graph_flow
 from utils.conversation_history import format_conversation_history
 from utils.message_utils import create_message_update_command
+from utils.message_filtering import filter_messages_for_agent, get_last_human_message
+from utils.llm_retry import invoke_with_retry
+from utils.error_handler import handle_llm_error
 
 
 def ordering_agent(state: ReceptionistState) -> Command | ReceptionistState:
@@ -27,33 +30,30 @@ def ordering_agent(state: ReceptionistState) -> Command | ReceptionistState:
     messages = state.get("messages", [])
     language = state.get("language", DEFAULT_LANGUAGE)
     
+    # Filter messages before processing (excludes ToolMessages and SystemMessages by default)
+    filtered_messages = filter_messages_for_agent(messages, include_system=False, include_tool_results=False)
+    last_human_message = get_last_human_message(messages)
+    
     # Check if user message indicates completion/finalization (dynamic intent detection)
     # If so, update intent to "payment" for direct transition
     current_intent = state.get("intent", "ordering")
-    if messages:
-        last_user_msg = None
-        for msg in reversed(messages):
-            if isinstance(msg, HumanMessage):
-                last_user_msg = msg
-                break
+    if last_human_message:
+        msg_lower = last_human_message.content.lower() if last_human_message.content else ""
+        completion_phrases = ["thats all", "that's all", "finalize", "finalise", "complete", "done", "ready", "let's finalize", "lets finalize", "finalize the order", "no i don't want to add", "no more"]
+        has_cart_context = any(word in " ".join([str(m.content) for m in messages[-10:]]).lower() for word in ["cart", "order", "add", "item"])
         
-        if last_user_msg:
-            msg_lower = last_user_msg.content.lower() if last_user_msg.content else ""
-            completion_phrases = ["thats all", "that's all", "finalize", "finalise", "complete", "done", "ready", "let's finalize", "lets finalize", "finalize the order", "no i don't want to add", "no more"]
-            has_cart_context = any(word in " ".join([str(m.content) for m in messages[-10:]]).lower() for word in ["cart", "order", "add", "item"])
-            
-            if has_cart_context and any(phrase in msg_lower for phrase in completion_phrases):
-                # Update intent to payment for direct transition
-                current_intent = "payment"
-                log_agent_flow("ORDERING", "Intent transition detected: ordering -> payment", {"trigger": msg_lower})
+        if has_cart_context and any(phrase in msg_lower for phrase in completion_phrases):
+            # Update intent to payment for direct transition
+            current_intent = "payment"
+            log_agent_flow("ORDERING", "Intent transition detected: ordering -> payment", {"trigger": msg_lower})
     
     # Get prompt and create system message
     ordering_prompt = get_prompt("ordering_agent")
     
-    # Trim messages for token limits BEFORE formatting history (matches what LLM will see)
+    # Trim messages for token limits AFTER filtering (matches what LLM will see)
     # Remove end_on to preserve AIMessages with tool calls (end_on excludes them)
     trimmed_messages = trim_messages(
-        messages,
+        filtered_messages,  # Use filtered messages instead of raw messages
         strategy="last",
         token_counter=count_tokens_approximately,
         max_tokens=3000,
@@ -108,11 +108,22 @@ def ordering_agent(state: ReceptionistState) -> Command | ReceptionistState:
         llm_with_tools = llm
         log_agent_flow("ORDERING", "LLM without Tools", {"tools_bound": False})
     
-    # Get response from LLM
+    # Get response from LLM with retry logic
     log_llm_call(llm_service.provider_name, llm_service.model_name, "Ordering Agent")
-    response = llm_with_tools.invoke(agent_messages)
-    response_time = time.time() - start_time
-    log_llm_call(llm_service.provider_name, llm_service.model_name, "Ordering Agent", response_time)
+    try:
+        response = invoke_with_retry(
+            llm=llm_with_tools,
+            messages=agent_messages,
+            max_retries=3,
+            initial_delay=1.0,
+            agent_name="ordering_agent"
+        )
+        response_time = time.time() - start_time
+        log_llm_call(llm_service.provider_name, llm_service.model_name, "Ordering Agent", response_time)
+    except Exception as e:
+        response_time = time.time() - start_time
+        log_llm_call(llm_service.provider_name, llm_service.model_name, "Ordering Agent", response_time)
+        return handle_llm_error(e, "ordering_agent", state)
     
     # Check for tool calls
     if hasattr(response, 'tool_calls') and response.tool_calls:

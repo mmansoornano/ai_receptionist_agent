@@ -49,20 +49,50 @@ def process_message(
     log_llm_call(LLM_PROVIDER, model_name, "Configuration")
     
     try:
+        # Use conversation_id or customer_id as thread_id for state persistence
+        from utils.state_utils import get_thread_id, get_config, reset_conversation_state
+        thread_id = get_thread_id(conversation_id, customer_id, phone_number)
+        config = get_config(thread_id)
+        
         # Check if this is a reset message
         message_lower = message.lower().strip()
         is_reset = any(keyword in message_lower for keyword in ["reset", "start over", "new conversation", "clear"])
         
-        # If reset and customer_id exists, clear the cart
-        if is_reset and customer_id:
-            from services.cart_service import clear_cart
-            try:
-                clear_cart(customer_id)
-                agent_logger.info(f"🛒 Cart cleared for customer_id: {customer_id}")
-            except Exception as e:
-                agent_logger.warning(f"⚠️ Failed to clear cart: {e}")
+        # Handle reset: clear state and cart
+        if is_reset:
+            # Clear conversation state (checkpointer)
+            reset_conversation_state(conversation_id, customer_id, phone_number)
+            
+            # Clear cart if customer_id exists
+            if customer_id:
+                from services.cart_service import clear_cart
+                try:
+                    clear_cart(customer_id)
+                    agent_logger.info(f"🛒 Cart cleared for customer_id: {customer_id}")
+                except Exception as e:
+                    agent_logger.warning(f"⚠️ Failed to clear cart: {e}")
+            
+            # Return reset confirmation message
+            return "Conversation has been reset. How can I help you today?"
         
-        # Create initial state
+        # Get existing state from checkpointer (if any)
+        try:
+            current_state = receptionist_graph.get_state(config)
+            existing_messages = current_state.values.get("messages", []) if current_state.values else []
+            existing_customer_id = current_state.values.get("customer_id") if current_state.values else None
+            
+            # Use existing customer_id if not provided (for state continuity)
+            if not customer_id and existing_customer_id:
+                customer_id = existing_customer_id
+                agent_logger.info(f"🔄 Using existing customer_id from state: {customer_id}")
+            
+            agent_logger.info(f"📊 Existing state: {len(existing_messages)} messages, customer_id: {existing_customer_id}")
+        except Exception as e:
+            # First message in conversation - no existing state
+            existing_messages = []
+            agent_logger.info(f"🆕 Starting new conversation: {thread_id}")
+        
+        # Create state with only new message - reducer will merge with existing from checkpointer
         initial_state: ReceptionistState = {
             "messages": [HumanMessage(content=message)],
             "intent": None,
@@ -75,15 +105,45 @@ def process_message(
             "customer_id": customer_id,
         }
         
-        # Run the graph
+        # Run the graph with config for state persistence
         agent_logger.info("🔄 Executing agent graph...")
-        result = receptionist_graph.invoke(initial_state)
+        workflow_start_time = time.time()
         
-        # Log final intent
+        try:
+            # Note: Proper timeout handling would require async (astream with asyncio.timeout)
+            # For sync invoke, we rely on LLM service timeouts and log execution time
+            result = receptionist_graph.invoke(initial_state, config)
+            workflow_time = time.time() - workflow_start_time
+            
+            # Warn if execution took too long (but don't fail)
+            if workflow_time > 60:
+                agent_logger.warning(f"⏱️ Graph execution took {workflow_time:.2f}s (slow)")
+        except Exception as e:
+            workflow_time = time.time() - workflow_start_time
+            agent_logger.error(f"❌ Graph execution error after {workflow_time:.2f}s: {e}")
+            log_error(e, "graph_invoke")
+            # Return user-friendly error message instead of raising
+            return "Oh, something went wrong there. Can you try typing that in a different way?"
+        
+        # Get final state from checkpointer for comprehensive logging
+        try:
+            final_state = receptionist_graph.get_state(config)
+            final_message_count = len(final_state.values.get("messages", [])) if final_state.values else 0
+            
+            log_agent_flow("SYSTEM", "State After Execution", {
+                "final_message_count": final_message_count,
+                "thread_id": thread_id
+            })
+        except Exception as e:
+            agent_logger.warning(f"⚠️ Could not retrieve final state: {e}")
+        
+        # Log final intent and execution time
         final_intent = result.get("intent", "unknown")
+        total_time = time.time() - start_time
         log_agent_flow("SYSTEM", "Graph Execution Complete", {
             "intent": final_intent,
-            "execution_time": f"{time.time() - start_time:.2f}s"
+            "execution_time": f"{total_time:.2f}s",
+            "workflow_time": f"{workflow_time:.2f}s" if 'workflow_time' in locals() else "N/A"
         })
         
         # Get the last AI message with content (skip ToolMessages and tool call JSON)
@@ -112,8 +172,10 @@ def process_message(
         
     except Exception as e:
         log_error(e, "process_message")
+        agent_logger.error(f"❌ Fatal error in process_message: {e}")
         agent_logger.info("=" * 80)
-        raise
+        # Return user-friendly error message instead of raising
+        return "I'm sorry, something unexpected happened. Please try again in a moment."
 
 
 if __name__ == "__main__":
