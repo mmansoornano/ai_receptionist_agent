@@ -111,3 +111,32 @@ def log_error(error: Exception, context: str = None):
         message += f" | Context={context}"
     message += f" | {type(error).__name__}: {str(error)}"
     agent_logger.error(message, extra={'color': True}, exc_info=True)
+
+
+def log_prompt(agent_name: str, prompt: str, context: dict = None):
+    """Log the prompt being used by an agent."""
+    context = context or {}
+    message = f"📝 [{agent_name}] Prompt"
+    if context:
+        context_str = " | ".join([f"{k}={v}" for k, v in context.items()])
+        message += f" | {context_str}"
+    
+    # Log header
+    agent_logger.info(message, extra={'color': True})
+    
+    # Log complete prompt (full content, not truncated)
+    agent_logger.info(f"   Complete Prompt:\n{'='*80}\n{prompt}\n{'='*80}", extra={'color': False})
+
+
+def log_graph_flow(node_name: str, action: str, details: dict = None):
+    """Log graph execution flow."""
+    details = details or {}
+    message = f"🔄 [GRAPH] {node_name} | {action}"
+    if details:
+        details_str = " | ".join([f"{k}={v}" for k, v in details.items()])
+        message += f" | {details_str}"
+    agent_logger.info(message, extra={'color': True})
+
+def log_conversation_history(conversation_history: str):
+    """Log conversation history."""
+    agent_logger.info(f"CONVERSATION HISTORY:\n{conversation_history}", extra={'color': False})

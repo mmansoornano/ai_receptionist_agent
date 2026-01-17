@@ -1,17 +1,24 @@
 """Ordering agent for managing shopping cart and orders."""
 import time
-from langchain_core.messages import SystemMessage, ToolMessage
+from langchain_core.messages import SystemMessage, ToolMessage, trim_messages
+from langchain_core.messages.utils import count_tokens_approximately
+from langgraph.types import Command
 from config import DEFAULT_LANGUAGE
 from services.llm_service import get_llm_service
 from services.prompt_loader import get_prompt
 from graph.state import ReceptionistState
 from tools.cart_tool import CART_TOOLS
 from langgraph.prebuilt import ToolNode
-from utils.logger import log_agent_flow, log_llm_call
+from utils.logger import log_agent_flow, log_llm_call, log_prompt, log_graph_flow
+from utils.conversation_history import format_conversation_history
+from utils.message_utils import create_message_update_command
 
 
-def ordering_agent(state: ReceptionistState) -> ReceptionistState:
+def ordering_agent(state: ReceptionistState) -> Command | ReceptionistState:
     """Ordering agent that handles cart management."""
+    from langchain_core.messages import HumanMessage
+    
+    log_graph_flow("ordering_agent", "Entering Node")
     log_agent_flow("ORDERING", "Agent Invoked", {
         "tools_count": len(CART_TOOLS) if CART_TOOLS else 0,
         "tools": [tool.name for tool in CART_TOOLS] if CART_TOOLS else []
@@ -20,15 +27,73 @@ def ordering_agent(state: ReceptionistState) -> ReceptionistState:
     messages = state.get("messages", [])
     language = state.get("language", DEFAULT_LANGUAGE)
     
+    # Check if user message indicates completion/finalization (dynamic intent detection)
+    # If so, update intent to "payment" for direct transition
+    current_intent = state.get("intent", "ordering")
+    if messages:
+        last_user_msg = None
+        for msg in reversed(messages):
+            if isinstance(msg, HumanMessage):
+                last_user_msg = msg
+                break
+        
+        if last_user_msg:
+            msg_lower = last_user_msg.content.lower() if last_user_msg.content else ""
+            completion_phrases = ["thats all", "that's all", "finalize", "finalise", "complete", "done", "ready", "let's finalize", "lets finalize", "finalize the order", "no i don't want to add", "no more"]
+            has_cart_context = any(word in " ".join([str(m.content) for m in messages[-10:]]).lower() for word in ["cart", "order", "add", "item"])
+            
+            if has_cart_context and any(phrase in msg_lower for phrase in completion_phrases):
+                # Update intent to payment for direct transition
+                current_intent = "payment"
+                log_agent_flow("ORDERING", "Intent transition detected: ordering -> payment", {"trigger": msg_lower})
+    
     # Get prompt and create system message
     ordering_prompt = get_prompt("ordering_agent")
+    
+    # Trim messages for token limits BEFORE formatting history (matches what LLM will see)
+    # Remove end_on to preserve AIMessages with tool calls (end_on excludes them)
+    trimmed_messages = trim_messages(
+        messages,
+        strategy="last",
+        token_counter=count_tokens_approximately,
+        max_tokens=3000,
+        start_on="human",
+        include_system=False,
+        allow_partial=False
+    )
+    
+    # Format conversation history from FULL messages in state (not trimmed)
+    # This ensures we can show the last 10 conversation messages, even if trim_messages
+    # limits tokens and only keeps a few messages for the LLM call
+    conversation_history = format_conversation_history(messages, max_messages=10)  # Use full messages for history
+    if conversation_history:
+        # Count actual messages in history (each line represents one message exchange)
+        history_line_count = len(conversation_history.split("\n")) if conversation_history else 0
+        ordering_prompt += f"\n\nCONVERSATION HISTORY (last {history_line_count} messages):\n{conversation_history}\n\nUse this conversation history to understand context, interpret user responses correctly, and maintain conversation flow."
+    
     customer_id = state.get("customer_id")
+    
+    # CRITICAL: Always use customer_id, never "anonymous"
     if customer_id:
-        ordering_prompt += f"\n\nCustomer ID: {customer_id}\nAlways pass this customer_id to cart or address tools."
+        ordering_prompt += f"\n\nCRITICAL - Customer ID: {customer_id}\nYou MUST ALWAYS pass this exact customer_id to ALL cart tools (add_item_to_cart, view_cart, update_cart_quantity, remove_item_from_cart, clear_shopping_cart, set_delivery_address). NEVER use 'anonymous' - always use: {customer_id}"
+    else:
+        # Generate or use phone_number as customer_id if not provided
+        # For now, use "anonymous" but log warning
+        ordering_prompt += "\n\nWARNING: No customer_id in state. Using 'anonymous' - this may cause cart issues."
+        log_agent_flow("ORDERING", "No customer_id in state", {"using_anonymous": True})
+    
+    # Log the prompt being used
+    log_prompt("ORDERING_AGENT", ordering_prompt, {
+        "customer_id": customer_id,
+        "current_intent": current_intent,
+        "message_count": len(messages)
+    })
+    
     system_msg = SystemMessage(content=ordering_prompt)
     
-    # Prepare messages with system prompt
-    agent_messages = [system_msg] + messages
+    # Prepare messages with system prompt (trimmed messages already processed above)
+    # Full message history remains in state - trimmed_messages are only for LLM context
+    agent_messages = [system_msg] + trimmed_messages
     
     # Initialize LLM with tools
     start_time = time.time()
@@ -56,10 +121,28 @@ def ordering_agent(state: ReceptionistState) -> ReceptionistState:
             "tools": [tc.get('name', 'unknown') for tc in response.tool_calls]
         })
     
-    # Add response to messages
-    new_messages = messages + [response]
+    has_tool_calls = bool(hasattr(response, 'tool_calls') and response.tool_calls)
+    log_graph_flow("ordering_agent", "Exiting Node", {
+        "intent": current_intent,
+        "has_tool_calls": has_tool_calls
+    })
     
-    return {**state, "messages": new_messages}
+    # Use Command for dynamic routing: tools -> tools, payment intent -> payment_agent, otherwise end
+    # add_messages reducer will APPEND response to existing messages, preserving ALL old messages
+    if has_tool_calls:
+        next_node = "tools"
+    elif current_intent == "payment":
+        next_node = "payment_agent"
+    else:
+        next_node = "__end__"
+    
+    return create_message_update_command(
+        [response],
+        state=state,
+        goto=next_node,
+        intent=current_intent,
+        active_agent="ordering_agent"
+    )
 
 
 class OrderingToolNodeWithState:
@@ -99,14 +182,17 @@ class OrderingToolNodeWithState:
                 tool_args = getattr(tool_call, 'args', {}).copy() if hasattr(tool_call, 'args') else {}
                 tool_id = getattr(tool_call, 'id', '') if hasattr(tool_call, 'id') else ''
             
-            # If this is a cart-related tool and customer_id is available, inject it
-            if customer_id and tool_name in ['add_item_to_cart', 'view_cart', 'update_cart_quantity', 'remove_item_from_cart', 'clear_shopping_cart']:
-                if 'customer_id' not in tool_args or tool_args.get('customer_id') == 'anonymous':
-                    tool_args['customer_id'] = customer_id
+            # If this is a cart-related tool and customer_id is available, ALWAYS inject it
+            if customer_id and tool_name in ['add_item_to_cart', 'view_cart', 'update_cart_quantity', 'remove_item_from_cart', 'clear_shopping_cart', 'set_delivery_address']:
+                # Always override customer_id to ensure consistency with state
+                previous_customer_id = tool_args.get('customer_id', 'not_set')
+                tool_args['customer_id'] = customer_id
+                if previous_customer_id != customer_id:
                     modified = True
                     log_agent_flow("ORDERING", "Injected customer_id into tool call", {
                         "tool": tool_name,
-                        "customer_id": customer_id
+                        "customer_id": customer_id,
+                        "previous_customer_id": previous_customer_id
                     })
             
             # Reconstruct tool call

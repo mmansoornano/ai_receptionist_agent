@@ -1,33 +1,19 @@
 """Main LangGraph graph orchestration."""
 from langgraph.graph import StateGraph, START, END
+from langgraph.types import Command
 from graph.state import ReceptionistState
-from graph.router import router_agent, route_to_agent
+from graph.router import router_agent
 from graph.qa_agent import qa_agent, qa_tool_node
 from graph.ordering_agent import ordering_agent, ordering_tool_node
 from graph.payment_agent import payment_agent, payment_tool_node
 from graph.cancellation_agent import cancellation_agent, cancellation_tool_node
-from langchain_core.messages import AIMessage
 
 
-def should_continue(state: ReceptionistState) -> str:
-    """Determine if we should continue or end."""
-    messages = state.get("messages", [])
-    if not messages:
-        return "end"
-    
-    last_message = messages[-1]
-    
-    # If last message has tool calls, execute tools
-    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        return "tools"
-    
-    # Otherwise, end conversation
-    return "end"
-
-
-def call_tools(state: ReceptionistState) -> ReceptionistState:
+def call_tools(state: ReceptionistState) -> Command | ReceptionistState:
     """Route to appropriate tool node based on intent."""
-    from utils.logger import log_agent_flow
+    from utils.logger import log_agent_flow, log_graph_flow
+    
+    log_graph_flow("tools", "Entering Node")
     
     intent = state.get("intent", "general_qa")
     messages = state.get("messages", [])
@@ -44,26 +30,80 @@ def call_tools(state: ReceptionistState) -> ReceptionistState:
         "tools": tool_calls
     })
     
+    # Preserve active_agent and intent from original state (tool nodes don't preserve them)
+    active_agent = state.get("active_agent")
+    original_intent = state.get("intent", intent)
+    
+    result_state = state
     if intent == "ordering" and ordering_tool_node:
-        result = ordering_tool_node.invoke(state)
+        result_state = ordering_tool_node.invoke(state)
         log_agent_flow("TOOLS", "Ordering Tools Executed")
-        return result
     elif intent == "payment" and payment_tool_node:
-        result = payment_tool_node.invoke(state)
+        result_state = payment_tool_node.invoke(state)
         log_agent_flow("TOOLS", "Payment Tools Executed")
-        return result
     elif intent == "cancellation" and cancellation_tool_node:
-        result = cancellation_tool_node.invoke(state)
+        result_state = cancellation_tool_node.invoke(state)
         log_agent_flow("TOOLS", "Cancellation Tools Executed")
-        return result
     elif (intent == "product_inquiry" or intent == "general_qa") and qa_tool_node:
-        result = qa_tool_node.invoke(state)
+        result_state = qa_tool_node.invoke(state)
         log_agent_flow("TOOLS", "QA Tools Executed")
-        return result
     else:
         # No tools to execute
         log_agent_flow("TOOLS", "No Tools to Execute")
-        return state
+    
+    # Preserve active_agent and intent in result_state (tool nodes only return messages)
+    if active_agent or original_intent:
+        result_state = {
+            **result_state,
+            "active_agent": active_agent or result_state.get("active_agent"),
+            "intent": original_intent or result_state.get("intent", intent)
+        }
+    
+    log_graph_flow("tools", "Exiting Node", {"intent": intent})
+    
+    # #region debug log
+    import json
+    import time
+    try:
+        with open("/Users/home/Documents/Convsol/Agent/AI Receptionist/AI_receptionist_agent/.cursor/debug.log", "a") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"main.py:53","message":"AFTER tools - routing decision","data":{"active_agent_from_state":result_state.get("active_agent"),"intent":result_state.get("intent"),"has_active_agent":bool(result_state.get("active_agent")),"original_active_agent":active_agent,"original_intent":original_intent},"timestamp":int(time.time()*1000)}) + "\n")
+    except: pass
+    # #endregion
+    
+    # Use Command to route back to the active agent after tools execute
+    active_agent = result_state.get("active_agent")
+    if active_agent:
+        # #region debug log
+        try:
+            with open("/Users/home/Documents/Convsol/Agent/AI Receptionist/AI_receptionist_agent/.cursor/debug.log", "a") as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"main.py:59","message":"Routing via active_agent","data":{"active_agent":active_agent},"timestamp":int(time.time()*1000)}) + "\n")
+        except: pass
+        # #endregion
+        return Command(
+            update={},
+            goto=active_agent
+        )
+    
+    # Fallback routing based on intent
+    intent = result_state.get("intent", "general_qa")
+    agent_mapping = {
+        "ordering": "ordering_agent",
+        "payment": "payment_agent",
+        "cancellation": "cancellation_agent"
+    }
+    next_agent = agent_mapping.get(intent, "qa_agent")
+    
+    # #region debug log
+    try:
+        with open("/Users/home/Documents/Convsol/Agent/AI Receptionist/AI_receptionist_agent/.cursor/debug.log", "a") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"main.py:70","message":"Fallback routing via intent","data":{"intent":intent,"next_agent":next_agent},"timestamp":int(time.time()*1000)}) + "\n")
+    except: pass
+    # #endregion
+    
+    return Command(
+        update={},
+        goto=next_agent
+    )
 
 
 def create_receptionist_graph():
@@ -71,7 +111,9 @@ def create_receptionist_graph():
     # Create graph
     workflow = StateGraph(ReceptionistState)
     
-    # Add nodes
+    # Add nodes - with Command, nodes can specify next node dynamically
+    # The actual routing is handled by Command returns from nodes
+    # Visualization will automatically show destinations based on Command returns
     workflow.add_node("router", router_agent)
     workflow.add_node("qa_agent", qa_agent)
     workflow.add_node("ordering_agent", ordering_agent)
@@ -79,53 +121,8 @@ def create_receptionist_graph():
     workflow.add_node("cancellation_agent", cancellation_agent)
     workflow.add_node("tools", call_tools)
     
-    # Add edges
+    # Add initial entry point - only edge needed since Command handles all other routing
     workflow.add_edge(START, "router")
-    workflow.add_conditional_edges(
-        "router",
-        route_to_agent,
-        {
-            "qa_agent": "qa_agent",
-            "ordering_agent": "ordering_agent",
-            "payment_agent": "payment_agent",
-            "cancellation_agent": "cancellation_agent",
-        }
-    )
-    
-    # Add conditional edges for each agent
-    for agent_name in ["qa_agent", "ordering_agent", "payment_agent", "cancellation_agent"]:
-        workflow.add_conditional_edges(
-            agent_name,
-            should_continue,
-            {
-                "tools": "tools",
-                "end": END,
-            }
-        )
-    
-    # After tools, continue back to the agent
-    def route_after_tools(state: ReceptionistState) -> str:
-        """Route back to agent after tools."""
-        intent = state.get("intent", "general_qa")
-        if intent == "ordering":
-            return "ordering_agent"
-        elif intent == "payment":
-            return "payment_agent"
-        elif intent == "cancellation":
-            return "cancellation_agent"
-        else:
-            return "qa_agent"
-    
-    workflow.add_conditional_edges(
-        "tools",
-        route_after_tools,
-        {
-            "qa_agent": "qa_agent",
-            "ordering_agent": "ordering_agent",
-            "payment_agent": "payment_agent",
-            "cancellation_agent": "cancellation_agent",
-        }
-    )
     
     # Compile graph
     return workflow.compile()

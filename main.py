@@ -49,6 +49,19 @@ def process_message(
     log_llm_call(LLM_PROVIDER, model_name, "Configuration")
     
     try:
+        # Check if this is a reset message
+        message_lower = message.lower().strip()
+        is_reset = any(keyword in message_lower for keyword in ["reset", "start over", "new conversation", "clear"])
+        
+        # If reset and customer_id exists, clear the cart
+        if is_reset and customer_id:
+            from services.cart_service import clear_cart
+            try:
+                clear_cart(customer_id)
+                agent_logger.info(f"🛒 Cart cleared for customer_id: {customer_id}")
+            except Exception as e:
+                agent_logger.warning(f"⚠️ Failed to clear cart: {e}")
+        
         # Create initial state
         initial_state: ReceptionistState = {
             "messages": [HumanMessage(content=message)],
@@ -73,17 +86,21 @@ def process_message(
             "execution_time": f"{time.time() - start_time:.2f}s"
         })
         
-        # Get the last AI message with content (skip ToolMessages)
-        from langchain_core.messages import AIMessage
+        # Get the last AI message with content (skip ToolMessages and tool call JSON)
+        from langchain_core.messages import AIMessage, ToolMessage
         messages = result.get("messages", [])
         if messages:
-            # Find the last AIMessage with content (not tool calls)
-            for msg in reversed(messages):
-                if isinstance(msg, AIMessage) and hasattr(msg, 'content') and msg.content:
-                    # Skip if it only has tool calls and no content
-                    if hasattr(msg, 'tool_calls') and msg.tool_calls and not msg.content.strip():
+            # Filter out ToolMessages completely - they should never be displayed
+            ai_messages = [msg for msg in messages if isinstance(msg, AIMessage) and not isinstance(msg, ToolMessage)]
+            
+            # Find the last AIMessage with content (not just tool calls)
+            for msg in reversed(ai_messages):
+                if hasattr(msg, 'content') and msg.content and msg.content.strip():
+                    response = msg.content.strip()
+                    # Additional check: if response looks like JSON tool output, skip it
+                    if response.startswith('{') and ('"name":' in response or '"parameters":' in response):
+                        agent_logger.warning(f"⚠️ Skipping tool call JSON in response: {response[:100]}...")
                         continue
-                    response = msg.content
                     agent_logger.info(f"📤 Agent Response: {response}")
                     agent_logger.info("=" * 80)
                     return response

@@ -10,6 +10,8 @@ versions:
       4. Submit the cancellation request using submit_order_cancellation tool
       5. Provide customer service contact information for refunds and reimbursements
 
+      CRITICAL: Always use the FULL conversation history above to understand context. If the customer has already provided information (like order ID or reason), do not ask for it again. Track what information has been collected and proceed to the next step.
+
       For refunds and reimbursements, customers need to contact customer service directly.
       Use get_cancellation_contact_info tool to provide the contact number.
 
