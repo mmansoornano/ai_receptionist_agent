@@ -8,6 +8,7 @@ from services.llm_service import get_llm_service
 from services.prompt_loader import get_prompt
 from graph.state import ReceptionistState
 from tools.cart_tool import CART_TOOLS
+from tools.product_tool import PRODUCT_TOOLS
 from langgraph.prebuilt import ToolNode
 from utils.logger import log_agent_flow, log_llm_call, log_prompt, log_graph_flow
 from utils.conversation_history import format_conversation_history
@@ -22,9 +23,12 @@ def ordering_agent(state: ReceptionistState) -> Command | ReceptionistState:
     from langchain_core.messages import HumanMessage
     
     log_graph_flow("ordering_agent", "Entering Node")
+    # Combine cart tools and product tools for ordering agent
+    ORDERING_TOOLS = (CART_TOOLS or []) + (PRODUCT_TOOLS or [])
+    
     log_agent_flow("ORDERING", "Agent Invoked", {
-        "tools_count": len(CART_TOOLS) if CART_TOOLS else 0,
-        "tools": [tool.name for tool in CART_TOOLS] if CART_TOOLS else []
+        "tools_count": len(ORDERING_TOOLS),
+        "tools": [tool.name for tool in ORDERING_TOOLS]
     })
     
     messages = state.get("messages", [])
@@ -101,9 +105,9 @@ def ordering_agent(state: ReceptionistState) -> Command | ReceptionistState:
     llm = llm_service.get_llm(temperature=0.7)
     
     # Bind tools to LLM (if supported and tools available)
-    if llm_service.supports_tools() and CART_TOOLS:
-        llm_with_tools = llm.bind_tools(CART_TOOLS)
-        log_agent_flow("ORDERING", "LLM with Tools", {"tools_bound": True})
+    if llm_service.supports_tools() and ORDERING_TOOLS:
+        llm_with_tools = llm.bind_tools(ORDERING_TOOLS)
+        log_agent_flow("ORDERING", "LLM with Tools", {"tools_bound": True, "tools": [tool.name for tool in ORDERING_TOOLS]})
     else:
         llm_with_tools = llm
         log_agent_flow("ORDERING", "LLM without Tools", {"tools_bound": False})
@@ -242,5 +246,8 @@ class OrderingToolNodeWithState:
         return self.base_tool_node.invoke(state)
 
 
+# Combine cart tools and product tools for tool node
+ORDERING_TOOLS_FOR_NODE = (CART_TOOLS or []) + (PRODUCT_TOOLS or [])
+
 # Create custom tool node that injects customer_id
-ordering_tool_node = OrderingToolNodeWithState(CART_TOOLS) if CART_TOOLS else None
+ordering_tool_node = OrderingToolNodeWithState(ORDERING_TOOLS_FOR_NODE) if ORDERING_TOOLS_FOR_NODE else None

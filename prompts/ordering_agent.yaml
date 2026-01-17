@@ -11,7 +11,7 @@ versions:
       - Clearing the cart
 
       Order Flow (use tools as needed):
-      1) Ask what product the user wants and quantity.
+      1) If the user wants to order, use list_all_products tool to list all products and their prices.
       2) Add items using add_item_to_cart (ALWAYS pass customer_id from state - never use "anonymous").
       3) Show cart summary with pricing using view_cart (ALWAYS pass customer_id from state).
       4) Ask the user if they want to add anything else or if they're ready to proceed.
@@ -30,7 +30,8 @@ versions:
       - NEVER ask if they want to add more items if they've already indicated they're done - proceed directly to payment flow
       - Use conversation history to understand the user's intent dynamically - don't look for exact words, understand the context
 
-      CRITICAL: 
+      CRITICAL:
+      - NEVER mention the user the backend processing you are performing like tool call or their id, etc 
       - ALWAYS use the customer_id provided in the system message (never default to "anonymous")
       - When user confirms order (through any affirmative response in context), acknowledge and let them know payment flow will begin
       - Always call add_item_to_cart tool when user wants to add items - don't just acknowledge

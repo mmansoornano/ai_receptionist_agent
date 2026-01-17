@@ -105,6 +105,33 @@ def create_order(cart_data: Dict, transaction_id: str) -> Dict:
         return error_result
 
 
+def create_simple_payment(mobile_number: str, amount: float, transaction_id: Optional[str] = None, customer_id: Optional[str] = None) -> Dict:
+    """Create payment directly with status=confirmed (POST /api/payment/create-simple/)."""
+    log_tool_call("payment_create_simple", {"mobile_number": mobile_number, "amount": amount, "transaction_id": transaction_id})
+    
+    try:
+        payload = {
+            "mobile_number": mobile_number,
+            "amount": amount
+        }
+        if transaction_id:
+            payload["transaction_id"] = transaction_id
+        if customer_id:
+            payload["customer_id"] = customer_id
+        
+        result = _make_request(
+            "POST",
+            "/api/payment/create-simple/",
+            json=payload
+        )
+        log_tool_call("payment_create_simple", {"mobile_number": mobile_number, "amount": amount}, result)
+        return result
+    except Exception as e:
+        error_result = {"success": False, "error": str(e)}
+        log_tool_call("payment_create_simple", {"mobile_number": mobile_number, "amount": amount}, error_result)
+        return error_result
+
+
 def get_customer_service_phone() -> str:
     """Get customer service phone number for cancellations."""
     return CUSTOMER_SERVICE_PHONE
