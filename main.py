@@ -73,15 +73,20 @@ def process_message(
             "execution_time": f"{time.time() - start_time:.2f}s"
         })
         
-        # Get the last AI message
+        # Get the last AI message with content (skip ToolMessages)
+        from langchain_core.messages import AIMessage
         messages = result.get("messages", [])
         if messages:
-            last_message = messages[-1]
-            if hasattr(last_message, 'content'):
-                response = last_message.content
-                agent_logger.info(f"📤 Agent Response: {response}")
-                agent_logger.info("=" * 80)
-                return response
+            # Find the last AIMessage with content (not tool calls)
+            for msg in reversed(messages):
+                if isinstance(msg, AIMessage) and hasattr(msg, 'content') and msg.content:
+                    # Skip if it only has tool calls and no content
+                    if hasattr(msg, 'tool_calls') and msg.tool_calls and not msg.content.strip():
+                        continue
+                    response = msg.content
+                    agent_logger.info(f"📤 Agent Response: {response}")
+                    agent_logger.info("=" * 80)
+                    return response
         
         error_msg = "I didn't understand. Can you repeat?"
         agent_logger.warning(f"⚠️ No valid response generated, returning default message")

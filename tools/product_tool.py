@@ -1,5 +1,7 @@
 """Product listing tool for QA agent."""
+from collections import defaultdict
 from langchain_core.tools import tool
+from services.product_service import list_products
 from utils.logger import log_tool_call
 
 
@@ -13,49 +15,33 @@ def list_all_products() -> str:
         Formatted string with all products and their prices in PKR
     """
     log_tool_call("list_all_products", {})
-    
-    products = """PRODUCT CATALOG - All Available Products
 
-=== Protein Bars (15g Protein Each) - PKR 450.00 each ===
-- White Chocolate Brownie Protein Bar
-- Almond Brownie Protein Bar
-- Peanut Butter Fudge Protein Bar
-- Fitness Fuel - Pre & Post Workout Pack (Regular: PKR 3,350.00, Sale: PKR 3,200.00)
+    products = list_products()
+    if not products:
+        message = "No products are available right now."
+        log_tool_call("list_all_products", {}, message)
+        return message
 
-=== Chewy Protein Mini (7g Protein) - PKR 200.00 each ===
-- Chewy Protein Mini
+    grouped = defaultdict(list)
+    for product in products:
+        category = product.get("category") or "Other"
+        grouped[category].append(product)
 
-=== Granola Bars - PKR 220.00 each ===
-- Chocolate & Walnut Granola Bar
-- Chocolate & Peanut Butter Granola Bar
-- Coffee & Pumpkin Seed Granola Bar
-- Crunchy Choco Grain Granola Bar
-- 5 Granola Bars Pack (Regular: PKR 1,100.00, Sale: PKR 1,050.00)
+    lines = ["PRODUCT CATALOG - All Available Products"]
+    for category in sorted(grouped.keys()):
+        lines.append(f"\n=== {category.title()} ===")
+        for item in grouped[category]:
+            name = item.get("name") or item.get("product_id")
+            price = item.get("price")
+            if price is None:
+                lines.append(f"- {name}")
+            else:
+                lines.append(f"- {name}: PKR {float(price):,.2f}")
 
-=== Granola Cereal - PKR 800.00 each ===
-- Chocolate, Fruit & Nut Granola Cereal
-- Peanut Butter & Jelly Granola Cereal
-
-=== Cookies - PKR 200.00 each ===
-- Chocolate Chunks Cookie
-- Peanut Butter Cookie
-- Mix Cookie Box - 5 cookies (Regular: PKR 1,000.00, Sale: PKR 920.00)
-
-=== Gift Boxes ===
-- Gift Box – All Bars & Granola Cereals: PKR 4,320.00
-- Gift Box - All Bars: PKR 3,580.00
-- Gift Box – Protein Bars & Granola Cereal: PKR 3,150.00
-- Gift Box – Granola Bars & Cereal: PKR 2,660.00
-
-=== Special Offers ===
-- Buy 5 Protein Bars, Get 1 FREE (Regular: PKR 2,700.00, Sale: PKR 2,250.00)
-- Buy any 5 Granola Bars, Get 1 COOKIE FREE (Regular: PKR 1,300.00, Sale: PKR 1,100.00)
-
-All prices are in PKR (Pakistani Rupees).
-"""
-    
+    lines.append("\nAll prices are in PKR (Pakistani Rupees).")
+    message = "\n".join(lines)
     log_tool_call("list_all_products", {}, "Product list returned")
-    return products
+    return message
 
 
 # Export tools list
