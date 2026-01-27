@@ -1,7 +1,9 @@
 """Cart management tools for ordering agent."""
+import json
 from langchain_core.tools import tool
 from services.cart_service import (
     add_to_cart,
+    add_to_cart_batch,
     get_cart,
     update_cart_item,
     remove_from_cart,
@@ -9,6 +11,62 @@ from services.cart_service import (
 )
 from services.customer_service import update_delivery_address
 from utils.logger import log_tool_call
+
+
+@tool
+def add_items_to_cart_batch(customer_id: str, items_json: str) -> str:
+    """Add multiple products to the cart in one call. Use when the user adds several items at once (e.g. "Add X, Y, and Z to cart" or "Add 2 X and 1 Y to cart").
+
+    Args:
+        customer_id: Customer ID (use value from state, never "anonymous").
+        items_json: JSON array of objects, each with "product_id" (str) and "quantity" (int). Example: [{"product_id": "cookie-chocolate", "quantity": 1}, {"product_id": "granola-bar-chocolate-pb", "quantity": 2}]
+
+    Returns:
+        Success message with cart summary, or error.
+    """
+    log_tool_call("add_items_to_cart_batch", {"customer_id": customer_id, "items_json": items_json})
+    try:
+        items = json.loads(items_json)
+    except json.JSONDecodeError as e:
+        err = f"Invalid items_json: {e}"
+        log_tool_call("add_items_to_cart_batch", {"customer_id": customer_id}, err)
+        return err
+    if not isinstance(items, list) or not items:
+        err = "items_json must be a non-empty JSON array of {product_id, quantity}."
+        log_tool_call("add_items_to_cart_batch", {"customer_id": customer_id}, err)
+        return err
+    valid = []
+    errors = []
+    for i, x in enumerate(items):
+        if not isinstance(x, dict) or "product_id" not in x or "quantity" not in x:
+            errors.append(f"Item {i}: missing product_id or quantity")
+            continue
+        pid = str(x["product_id"]).strip()
+        try:
+            q = int(x["quantity"]) if x["quantity"] is not None else 1
+        except (TypeError, ValueError):
+            q = 1
+        if q < 1:
+            errors.append(f"Item {i}: quantity must be >= 1")
+            continue
+        valid.append({"product_id": pid, "quantity": q})
+    if not valid:
+        err = "No valid items. " + "; ".join(errors)
+        log_tool_call("add_items_to_cart_batch", {"customer_id": customer_id}, err)
+        return err
+    result = add_to_cart_batch(customer_id, valid)
+    if result.get("success"):
+        cart = result.get("cart", {})
+        total = cart.get("total", 0)
+        added = ", ".join(f"{x['quantity']} x {x['product_id']}" for x in valid)
+        msg = f"Added {added} to cart. Cart total: Rs.{total:.2f}"
+        if result.get("warnings"):
+            msg += "\nWarnings: " + "; ".join(result["warnings"])
+        log_tool_call("add_items_to_cart_batch", {"customer_id": customer_id}, msg)
+        return msg
+    err = f"Error: {result.get('error', 'Unknown error')}"
+    log_tool_call("add_items_to_cart_batch", {"customer_id": customer_id}, err)
+    return err
 
 
 @tool
@@ -178,6 +236,7 @@ def set_delivery_address(customer_id: str, delivery_address: str, phone: str = "
 # Export tools list
 CART_TOOLS = [
     add_item_to_cart,
+    add_items_to_cart_batch,
     view_cart,
     update_cart_quantity,
     remove_item_from_cart,

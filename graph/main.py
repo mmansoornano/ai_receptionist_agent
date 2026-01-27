@@ -71,6 +71,7 @@ def call_tools(state: ReceptionistState) -> Command | ReceptionistState:
     # #endregion
     
     # Use Command to route back to the active agent after tools execute
+    # CRITICAL: Include the updated messages (with ToolMessages) in the Command update
     active_agent = result_state.get("active_agent")
     if active_agent:
         # #region debug log
@@ -79,8 +80,9 @@ def call_tools(state: ReceptionistState) -> Command | ReceptionistState:
                 f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"main.py:59","message":"Routing via active_agent","data":{"active_agent":active_agent},"timestamp":int(time.time()*1000)}) + "\n")
         except: pass
         # #endregion
+        # Include messages update so ToolMessages are preserved
         return Command(
-            update={},
+            update={"messages": result_state.get("messages", [])},
             goto=active_agent
         )
     
@@ -100,8 +102,9 @@ def call_tools(state: ReceptionistState) -> Command | ReceptionistState:
     except: pass
     # #endregion
     
+    # Include messages update so ToolMessages are preserved
     return Command(
-        update={},
+        update={"messages": result_state.get("messages", [])},
         goto=next_agent
     )
 

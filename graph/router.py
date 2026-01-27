@@ -60,6 +60,33 @@ def router_agent(state: ReceptionistState) -> Command | ReceptionistState:
     # Use conversation history to understand context - let LLM decide based on full history
     # Don't force payment intent based on keywords - let the LLM analyze the full conversation
     conversation_history_lower = (conversation_history or "").lower()
+    current_message_lower = last_message.content.lower()
+    
+    # CRITICAL: Explicit detection of "add to cart" phrases - these MUST be ordering intent
+    explicit_add_to_cart_phrases = [
+        "add", "to cart", "add to cart", "add item", "add product", 
+        "add x", "add 1", "add 2", "add 3", "add 4", "add 5",
+        "put in cart", "put in my cart", "add in cart"
+    ]
+    has_explicit_add_to_cart = any(
+        phrase in current_message_lower 
+        for phrase in explicit_add_to_cart_phrases
+    )
+    
+    # If user explicitly says "add to cart", force ordering intent BEFORE LLM call
+    if has_explicit_add_to_cart:
+        log_intent_classification("ordering", "forced (explicit add to cart detected)")
+        intent = "ordering"
+        active_agent = "ordering_agent"
+        return Command(
+            update={
+                "intent": intent,
+                "conversation_context": conversation_history[-500:] if conversation_history and len(conversation_history) > 500 else conversation_history,
+                "active_agent": active_agent
+            },
+            goto=active_agent
+        )
+    
     has_ordering_context = any(
         word in conversation_history_lower 
         for word in ["cart", "order", "add", "item", "quantity", "total", "checkout", "added to cart"]
@@ -78,7 +105,7 @@ def router_agent(state: ReceptionistState) -> Command | ReceptionistState:
     
     # Only force payment intent if there's STRONG evidence of ordering context AND confirmation
     # Don't force it for simple "yes" responses without ordering context
-    current_message_lower = last_message.content.lower()
+    # current_message_lower already defined above
     completion_phrases = ["thats all", "that's all", "thats it", "that's it", "finalize", "finalise", "complete", "done", "ready", "let's finalize", "lets finalize", "finalize the order", "finalise the order", "complete the order", "ready to pay", "ready to checkout"]
     no_more_additions = "no" in current_message_lower and ("add" in current_message_lower or "change" in current_message_lower or "more" in current_message_lower) and (has_ordering_context or has_recent_cart_operation)
     

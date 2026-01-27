@@ -12,6 +12,18 @@ def _make_request(method: str, endpoint: str, **kwargs) -> Dict:
         response = requests.request(method, url, **kwargs)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.HTTPError as e:
+        body = None
+        try:
+            if e.response is not None and e.response.content:
+                body = e.response.json()
+        except Exception:
+            body = (e.response.text[:500] if e.response and e.response.text else None)
+        err = str(e)
+        if body is not None:
+            err = f"{e.response.status_code} {err}; body={body}"
+        log_tool_call("backend_api_error", {"endpoint": endpoint, "error": err})
+        raise ValueError(err) from e
     except requests.exceptions.RequestException as e:
         log_tool_call("backend_api_error", {"endpoint": endpoint, "error": str(e)})
         raise
@@ -20,7 +32,7 @@ def _make_request(method: str, endpoint: str, **kwargs) -> Dict:
 def add_to_cart(customer_id: str, product_id: str, quantity: int = 1) -> Dict:
     """Add item to cart (POST /api/cart/add/)."""
     log_tool_call("cart_add_item", {"customer_id": customer_id, "product_id": product_id, "quantity": quantity})
-    
+
     try:
         result = _make_request(
             "POST",
@@ -36,6 +48,25 @@ def add_to_cart(customer_id: str, product_id: str, quantity: int = 1) -> Dict:
     except Exception as e:
         error_result = {"success": False, "error": str(e)}
         log_tool_call("cart_add_item", {"customer_id": customer_id, "product_id": product_id}, error_result)
+        return error_result
+
+
+def add_to_cart_batch(customer_id: str, items: list) -> Dict:
+    """Add multiple items to cart (POST /api/cart/add-batch/).
+    items: list of {"product_id": str, "quantity": int}
+    """
+    log_tool_call("cart_add_batch", {"customer_id": customer_id, "item_count": len(items)})
+    try:
+        result = _make_request(
+            "POST",
+            "/api/cart/add-batch/",
+            json={"customer_id": customer_id, "items": items}
+        )
+        log_tool_call("cart_add_batch", {"customer_id": customer_id, "item_count": len(items)}, result)
+        return result
+    except Exception as e:
+        error_result = {"success": False, "error": str(e)}
+        log_tool_call("cart_add_batch", {"customer_id": customer_id, "items": items}, error_result)
         return error_result
 
 

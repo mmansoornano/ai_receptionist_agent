@@ -39,7 +39,7 @@ def qa_agent(state: ReceptionistState) -> Command | ReceptionistState:
     language = state.get("language", DEFAULT_LANGUAGE)
     
     # Filter messages before processing (excludes ToolMessages and SystemMessages by default)
-    filtered_messages = filter_messages_for_agent(messages, include_system=False, include_tool_results=False)
+    filtered_messages = filter_messages_for_agent(messages, include_system=True, include_tool_results=False)
     last_human_message = get_last_human_message(messages)
     
     # Get prompt and create system message

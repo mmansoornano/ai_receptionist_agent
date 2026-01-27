@@ -1,4 +1,5 @@
 """Main entry point for the agent system."""
+import re
 import time
 
 from graph.main import receptionist_graph
@@ -161,6 +162,10 @@ def process_message(
                     if response.startswith('{') and ('"name":' in response or '"parameters":' in response):
                         agent_logger.warning(f"⚠️ Skipping tool call JSON in response: {response[:100]}...")
                         continue
+                    # Strip "Customer ID: X - use this for all cart tools." (internal, never show in chat)
+                    lines = response.split("\n")
+                    filtered = [L for L in lines if not re.match(r"^\s*Customer ID:\s*\d+\s*-\s*use this for all cart tools\.?\s*$", L)]
+                    response = "\n".join(filtered).strip()
                     agent_logger.info(f"📤 Agent Response: {response}")
                     agent_logger.info("=" * 80)
                     return response

@@ -18,7 +18,7 @@ This document outlines the key concepts and utilities added from the reference i
 from utils.message_filtering import filter_messages_for_agent
 
 # Filter messages before processing
-filtered_messages = filter_messages_for_agent(messages, include_system=False)
+filtered_messages = filter_messages_for_agent(messages, include_system=True)
 ```
 
 **Benefits**:
