@@ -1,4 +1,5 @@
 """Main entry point for the agent system."""
+import os
 import re
 import time
 
@@ -9,6 +10,30 @@ from config import DEFAULT_LANGUAGE, DEFAULT_CHANNEL, LLM_PROVIDER, OLLAMA_MODEL
 from utils.logger import (
     agent_logger, log_agent_flow, log_llm_call, log_error
 )
+
+
+def _pii_full_logging() -> bool:
+    """Set AGENT_LOG_PII=1 to log full phone/customer ids and full user text at INFO."""
+    return os.environ.get("AGENT_LOG_PII", "").lower() in ("1", "true", "yes")
+
+
+def _mask_identifier(value: str | None, *, label: str) -> str | None:
+    if value is None:
+        return None
+    if _pii_full_logging():
+        return value
+    v = str(value).strip()
+    if len(v) <= 4:
+        return f"{label}:***"
+    return f"{label}:{v[:2]}…{v[-2:]}(n={len(v)})"
+
+
+def _preview_user_message(text: str) -> str:
+    if _pii_full_logging():
+        return text
+    if len(text) <= 240:
+        return text
+    return text[:240] + "…"
 
 
 def process_message(
@@ -37,13 +62,13 @@ def process_message(
     # Log incoming message
     agent_logger.info("=" * 80)
     log_agent_flow("SYSTEM", "Processing Message", {
-        "phone": phone_number,
+        "phone": _mask_identifier(phone_number, label="phone"),
         "channel": channel,
         "language": language,
-        "conversation_id": conversation_id,
-        "customer_id": customer_id
+        "conversation_id": _mask_identifier(conversation_id, label="conv"),
+        "customer_id": _mask_identifier(customer_id, label="cust"),
     })
-    agent_logger.info(f"📥 User Message: {message}")
+    agent_logger.info(f"📥 User Message: {_preview_user_message(message)}")
     
     # Log LLM configuration
     model_name = OLLAMA_MODEL if LLM_PROVIDER == 'ollama' else OPENAI_MODEL
@@ -85,9 +110,14 @@ def process_message(
             # Use existing customer_id if not provided (for state continuity)
             if not customer_id and existing_customer_id:
                 customer_id = existing_customer_id
-                agent_logger.info(f"🔄 Using existing customer_id from state: {customer_id}")
+                agent_logger.info(
+                    f"🔄 Using existing customer_id from state: {_mask_identifier(customer_id, label='cust')}"
+                )
             
-            agent_logger.info(f"📊 Existing state: {len(existing_messages)} messages, customer_id: {existing_customer_id}")
+            agent_logger.info(
+                f"📊 Existing state: {len(existing_messages)} messages, customer_id: "
+                f"{_mask_identifier(existing_customer_id, label='cust')}"
+            )
         except Exception as e:
             # First message in conversation - no existing state
             existing_messages = []
@@ -166,7 +196,7 @@ def process_message(
                     lines = response.split("\n")
                     filtered = [L for L in lines if not re.match(r"^\s*Customer ID:\s*\d+\s*-\s*use this for all cart tools\.?\s*$", L)]
                     response = "\n".join(filtered).strip()
-                    agent_logger.info(f"📤 Agent Response: {response}")
+                    agent_logger.info(f"📤 Agent Response: {_preview_user_message(response)}")
                     agent_logger.info("=" * 80)
                     return response
         

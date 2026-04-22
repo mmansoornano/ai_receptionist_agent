@@ -2,6 +2,10 @@
 
 An intelligent AI receptionist agent system built with LangGraph, FastAPI, and multiple LLM providers.
 
+This repository is intended to be **its own GitHub project** (deployed separately from the Django backend and the React frontend). Point **`BACKEND_API_BASE_URL`** at your backend URL; the backend repo sets **`AGENT_API_URL`** to reach this service.
+
+**Documentation site:** Markdown in **`docs/`** is ready for **GitHub Pages** (Jekyll). See [`docs/github-pages.md`](docs/github-pages.md). Overview: [`docs/architecture.md`](docs/architecture.md), integration: [`docs/integration.md`](docs/integration.md).
+
 ## Features
 
 - Multi-agent system with routing, QA, ordering, payment, and cancellation agents
@@ -105,7 +109,7 @@ Process a message through the agent system.
 ```
 
 ### GET `/health`
-Health check endpoint.
+Shallow liveness (process up).
 
 **Response:**
 ```json
@@ -113,6 +117,15 @@ Health check endpoint.
   "status": "healthy"
 }
 ```
+
+### GET `/health/ready`
+Short dependency probes (backend base URL, LLM path). Always returns **HTTP 200** with `status` of `ready` or `degraded` and `llm_ok` / `backend_ok` booleans for automation.
+
+### Errors on `POST /process`
+`message` is capped at **16000** characters. Most graph or LLM failures are turned into a **friendly assistant string** and still return **200** with `success: true` (see `main.py`). **`503`** is returned only if `process_message` raises an **unexpected** exception (same JSON body with `success: false` and `error` set).
+
+### CORS
+Set **`CORS_ORIGINS`** in `.env` to a comma-separated list (e.g. `http://localhost:3000`). If unset, all origins are allowed **without** credentials (wildcard-safe default).
 
 ## API Documentation
 
@@ -146,12 +159,13 @@ Once the server is running, you can access:
 │   ├── product_tool.py
 │   └── ...
 ├── prompts/               # Agent prompts (YAML)
+├── docs/                  # GitHub Pages (Jekyll) — project docs
 └── tests/                 # Test files
 ```
 
 ## Configuration
 
-Use **`.env`** in this folder (see **Installation**). Common keys: **`LLM_PROVIDER`** (`ollama` | `openai`), **`OLLAMA_*`**, **`OPENAI_API_KEY`**, **`OPENAI_MODEL`**, **`BACKEND_API_BASE_URL`**, **`AGENT_API_PORT`**.
+Use **`.env`** in this folder (see **Installation**). Common keys: **`LLM_PROVIDER`** (`ollama` | `openai`), **`OLLAMA_*`**, **`OPENAI_API_KEY`**, **`OPENAI_MODEL`**, **`BACKEND_API_BASE_URL`**, **`AGENT_API_PORT`**, **`CORS_ORIGINS`**. Optional dependency pinning notes: [`docs/dependencies.md`](docs/dependencies.md).
 
 ## Testing
 
@@ -207,4 +221,4 @@ python -m pytest -m integration tests/test_backend_integration.py
 
 ## License
 
-[Add your license here]
+See [LICENSE](LICENSE) (MIT).

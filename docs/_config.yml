@@ -1,0 +1,11 @@
+# GitHub Pages: Settings → Pages → Branch main, folder /docs
+theme: jekyll-theme-minimal
+title: AI Receptionist Agent
+description: LangGraph + FastAPI agent service documentation
+
+# Project Pages URL is https://<user>.github.io/<THIS_REPO_NAME>/
+# Set baseurl to "/<THIS_REPO_NAME>" (leading slash, no trailing slash).
+baseurl: ""
+url: ""
+
+markdown: kramdown
