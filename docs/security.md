@@ -9,7 +9,7 @@ By default, **INFO** logs **mask** phone / `conversation_id` / `customer_id` and
 
 ## HTTP surface (`api_server.py`)
 
-- **`POST /process`** — payload size limits on fields; **503** only on uncaught exceptions (see [HTTP API]({% link api.md %})).
+- **`POST /process`** — payload size limits on fields; **503** only on uncaught exceptions (see [HTTP API]({{ site.canonical_docs_url }}/api.html)).
 - **CORS** — explicit origins via **`CORS_ORIGINS`** recommended for public demos.
 
 ## Secrets

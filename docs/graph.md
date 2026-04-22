@@ -32,4 +32,4 @@ After an agent returns an **AIMessage** with **`tool_calls`**, the graph jumps t
 
 Each agent follows the same pattern: load prompt from YAML, build messages, **`invoke_with_retry`** on the tool-bound LLM, then **`create_message_update_command`** to append the assistant message and route to **`tools`** or **`__end__`**.
 
-See [Architecture]({% link architecture.md %}) and the source under `graph/`.
+See [Architecture]({{ site.canonical_docs_url }}/architecture.html) and the source under `graph/`.

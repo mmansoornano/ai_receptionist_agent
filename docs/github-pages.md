@@ -11,15 +11,18 @@ GitHub **project Pages** serves your site at:
 
 Every internal URL must include that **prefix**. In Jekyll that is the **`baseurl`** in **`docs/_config.yml`**.
 
-**Edit these three lines** when you fork or rename the repo:
+**Edit these lines** when you fork or rename the repo (keep **`url`**, **`baseurl`**, and **`canonical_docs_url`** aligned):
 
 ```yaml
 baseurl: "/ai_receptionist_agent"   # leading slash, no trailing slash
 url: "https://mmansoornano.github.io"
+canonical_docs_url: "https://mmansoornano.github.io/ai_receptionist_agent"  # no trailing slash
 github_repo: mmansoornano/ai_receptionist_agent
 ```
 
-After changing **`baseurl`**, push and wait for the Pages build. Navigation uses Jekyll’s {% raw %}`{% link %}`{% endraw %} tag so paths stay correct relative to **`baseurl`**.
+Nav, home-page cards, and cross-links use **`canonical_docs_url`** so they resolve like **`https://mmansoornano.github.io/ai_receptionist_agent/api.html`** even if a build mis-resolves relative paths. For a local Jekyll preview, temporarily point **`canonical_docs_url`** at your dev origin (for example `http://127.0.0.1:4000/ai_receptionist_agent`).
+
+**`relative_url`** is still used for **CSS** under **`/assets/`**, so **`baseurl`** must stay correct for styling.
 
 ## Enable Pages
 

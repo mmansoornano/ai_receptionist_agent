@@ -47,4 +47,4 @@ Router maps conversation to one of: **`product_inquiry`**, **`ordering`**, **`pa
 - **Backend**: expose REST + set **`AGENT_API_URL`** to this service.
 - **Frontend**: usually only **`VITE_BACKEND_URL`**; browser talks to Django, not directly to the agent.
 
-See [Integration]({% link integration.md %}).
+See [Integration]({{ site.canonical_docs_url }}/integration.html).

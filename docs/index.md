@@ -3,15 +3,17 @@ layout: default
 title: Home
 ---
 
+## Agent service overview
+
 This repository is the **AI Receptionist agent service**: a **FastAPI** app that runs a **LangGraph** graph for natural-language conversations. It classifies intent, calls specialist agents (QA, ordering, payment, cancellation), executes **tools** (HTTP to your Django API, RAG over a local vector store, calculators), and returns assistant replies. It supports **Ollama** and **OpenAI** via configuration.
 
 <div class="doc-cards">
-  <a class="doc-card" href="{% link architecture.md %}"><strong>Architecture</strong><span>What the service does, stack, and repo layout</span></a>
-  <a class="doc-card" href="{% link graph.md %}"><strong>LangGraph</strong><span>Nodes, routing, state, and tool loop</span></a>
-  <a class="doc-card" href="{% link api.md %}"><strong>HTTP API</strong><span><code>/process</code>, health checks, limits</span></a>
-  <a class="doc-card" href="{% link integration.md %}"><strong>Integration</strong><span>Backend + frontend repos and env vars</span></a>
-  <a class="doc-card" href="{% link security.md %}"><strong>Security</strong><span>CORS, PII logging, secrets</span></a>
-  <a class="doc-card" href="{% link dependencies.md %}"><strong>Dependencies</strong><span>Install and optional lock file</span></a>
+  <a class="doc-card" href="{{ site.canonical_docs_url }}/architecture.html"><strong>Architecture</strong><span>What the service does, stack, and repo layout</span></a>
+  <a class="doc-card" href="{{ site.canonical_docs_url }}/graph.html"><strong>LangGraph</strong><span>Nodes, routing, state, and tool loop</span></a>
+  <a class="doc-card" href="{{ site.canonical_docs_url }}/api.html"><strong>HTTP API</strong><span><code>/process</code>, health checks, limits</span></a>
+  <a class="doc-card" href="{{ site.canonical_docs_url }}/integration.html"><strong>Integration</strong><span>Backend + frontend repos and env vars</span></a>
+  <a class="doc-card" href="{{ site.canonical_docs_url }}/security.html"><strong>Security</strong><span>CORS, PII logging, secrets</span></a>
+  <a class="doc-card" href="{{ site.canonical_docs_url }}/dependencies.html"><strong>Dependencies</strong><span>Install and optional lock file</span></a>
 </div>
 
 ## Capabilities

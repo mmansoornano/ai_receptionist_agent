@@ -6,6 +6,10 @@ description: FastAPI + LangGraph — intent routing, tools, Ollama/OpenAI, RAG, 
 baseurl: "/ai_receptionist_agent"
 url: "https://mmansoornano.github.io"
 
+# Absolute prefix for in-site doc links (nav, cards, cross-links). No trailing slash.
+# Must match url + baseurl, e.g. https://<user>.github.io/<repo>
+canonical_docs_url: "https://mmansoornano.github.io/ai_receptionist_agent"
+
 # GitHub "owner/name" for header/footer links (edit when you fork).
 github_repo: mmansoornano/ai_receptionist_agent
 
