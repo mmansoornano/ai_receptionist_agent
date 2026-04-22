@@ -12,7 +12,7 @@ _AGENT_ROOT = Path(__file__).resolve().parent.parent
 if str(_AGENT_ROOT) not in sys.path:
     sys.path.insert(0, str(_AGENT_ROOT))
 
-from tests.llm_env_select import llm_provider_label, prepare_llm_env
+from tests.llm_env_select import judge_provider_label, llm_provider_label, prepare_judge_llm_env, prepare_llm_env
 
 
 def _banner(title: str) -> None:
@@ -21,7 +21,8 @@ def _banner(title: str) -> None:
     dim = "\033[2m"
     print(f"\n{bold}{line}{reset}")
     print(f"{bold}  {title}{reset}")
-    print(f"{bold}{line}{reset}\n{dim}LLM:{reset} {llm_provider_label(os.environ)}\n")
+    print(f"{bold}{line}{reset}\n{dim}Agent LLM:{reset} {llm_provider_label(os.environ)}")
+    print(f"{dim}Judge LLM:{reset} {judge_provider_label(os.environ)}\n")
 
 
 def _mark_expression(suite: str) -> str:
@@ -69,6 +70,10 @@ def main() -> int:
     err = prepare_llm_env(os.environ)
     if err:
         print(f"\033[91m{err}\033[0m", file=sys.stderr)
+        return 2
+    err_j = prepare_judge_llm_env(os.environ)
+    if err_j:
+        print(f"\033[91m{err_j}\033[0m", file=sys.stderr)
         return 2
 
     suite = args.suite.strip().lower()

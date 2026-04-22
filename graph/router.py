@@ -11,6 +11,56 @@ from utils.conversation_history import format_conversation_history
 from utils.message_utils import create_message_update_command
 
 
+def _looks_like_prompt_leak(text: str) -> bool:
+    t = (text or "").lower()
+    markers = (
+        "system prompt",
+        "**system",
+        "intent categor",
+        "intent classification",
+        "first: check if the user",
+        "sk_live",
+        "sk_test",
+        "api key",
+        "router.yaml",
+        "qa_agent.yaml",
+        "hidden system",
+        "do anything now",
+        "dan mode",
+        "your instructions before",
+    )
+    return any(m in t for m in markers)
+
+
+def _is_simple_greeting_user_message(user_text: str) -> bool:
+    """True only for short, benign openers — not questions or attacks."""
+    u = (user_text or "").strip().lower()
+    if not u or len(u) > 56:
+        return False
+    if "?" in u or "http://" in u or "https://" in u:
+        return False
+    # Single-line hi/hello/hey variants only
+    allowed = (
+        "hi",
+        "hi!",
+        "hello",
+        "hello!",
+        "hey",
+        "hey!",
+        "hey there",
+        "hey there!",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "greetings",
+        "sup",
+        "howdy",
+        "yo",
+        "hiya",
+    )
+    return u in allowed or (u.endswith("!") and u[:-1].strip() in {x.rstrip("!") for x in allowed if " " not in x})
+
+
 def router_agent(state: ReceptionistState) -> Command | ReceptionistState:
     """Router agent that classifies user intent using conversation history."""
     log_graph_flow("router", "Entering Node")
@@ -43,30 +93,28 @@ def router_agent(state: ReceptionistState) -> Command | ReceptionistState:
         conversation_history = f"{saved_context}\n\nRecent messages:\n{conversation_history}"
     elif saved_context:
         conversation_history = saved_context
-    
-    # Use LLM to classify intent with full conversation context
-    start_time = time.time()
-    llm_service = get_llm_service()
-    llm = llm_service.get_llm(temperature=0)
-    
-    router_prompt = get_prompt("router")
-    
-    # # Log the prompt being used
-    # log_prompt("ROUTER", router_prompt, {
-    #     "has_ordering_context": has_ordering_context if 'has_ordering_context' in locals() else False,
-    #     "message_count": len(messages)
-    # })
-    
-    # Use conversation history to understand context - let LLM decide based on full history
-    # Don't force payment intent based on keywords - let the LLM analyze the full conversation
+
     conversation_history_lower = (conversation_history or "").lower()
-    current_message_lower = last_message.content.lower()
-    
-    # CRITICAL: Explicit detection of "add to cart" phrases - these MUST be ordering intent
+    current_message_lower = (
+        last_message.content.lower()
+        if isinstance(last_message.content, str)
+        else str(last_message.content).lower()
+    )
+    # CRITICAL: Explicit detection of add-to-cart phrasing — MUST be ordering intent.
+    # Do NOT use bare "add" (matches "Adderall", "address", etc.). Require cart-oriented phrases.
     explicit_add_to_cart_phrases = [
-        "add", "to cart", "add to cart", "add item", "add product", 
-        "add x", "add 1", "add 2", "add 3", "add 4", "add 5",
-        "put in cart", "put in my cart", "add in cart"
+        "to cart",
+        "add to cart",
+        "add to my cart",
+        "add item",
+        "add items",
+        "add product",
+        "add products",
+        "put in cart",
+        "put in my cart",
+        "add in cart",
+        "add it to cart",
+        "add this to cart",
     ]
     has_explicit_add_to_cart = any(
         phrase in current_message_lower 
@@ -86,7 +134,14 @@ def router_agent(state: ReceptionistState) -> Command | ReceptionistState:
             },
             goto=active_agent
         )
-    
+
+    # Use LLM to classify intent with full conversation context
+    start_time = time.time()
+    llm_service = get_llm_service()
+    llm = llm_service.get_llm(temperature=0)
+
+    router_prompt = get_prompt("router")
+
     has_ordering_context = any(
         word in conversation_history_lower 
         for word in ["cart", "order", "add", "item", "quantity", "total", "checkout", "added to cart"]
@@ -153,8 +208,14 @@ Based on the current message, classify the intent."""
     
     # Check if response is a greeting (not an intent word)
     valid_intents = ["product_inquiry", "ordering", "payment", "cancellation", "general_qa"]
-    is_greeting_response = response_lower not in [intent.lower() for intent in valid_intents] and len(response_content) > 10
-    
+    user_raw = last_message.content if isinstance(last_message.content, str) else str(last_message.content)
+    is_greeting_response = (
+        response_lower not in [intent.lower() for intent in valid_intents]
+        and len(response_content) > 10
+        and _is_simple_greeting_user_message(user_raw)
+        and not _looks_like_prompt_leak(response_content)
+    )
+
     # If it's a greeting response, handle it directly
     if is_greeting_response:
         log_intent_classification("greeting", "greeting detected and handled by router")
@@ -241,6 +302,9 @@ def route_to_agent(state: ReceptionistState) -> Literal["qa_agent", "ordering_ag
     # Greetings are handled directly in router, end the flow
     if intent == "greeting":
         log_agent_flow("ROUTER", "Greeting Handled - Ending Flow")
+        return "__end__"
+    if intent == "guardrail_refuse":
+        log_agent_flow("ROUTER", "Guardrail refuse (should not reach here if graph starts at input_guard)")
         return "__end__"
     elif intent == "product_inquiry" or intent == "general_qa":
         log_agent_flow("ROUTER", "Routing to QA Agent")

@@ -23,6 +23,14 @@ OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.1:8b')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 
+# Input guard (pre-router). Same provider as main LLM by default; optional model overrides.
+_g_ollama = (os.getenv('GUARD_OLLAMA_MODEL') or '').strip()
+_g_openai = (os.getenv('GUARD_OPENAI_MODEL') or '').strip()
+GUARD_OLLAMA_MODEL = _g_ollama if _g_ollama else OLLAMA_MODEL
+GUARD_OPENAI_MODEL = _g_openai if _g_openai else OPENAI_MODEL
+# If set, skip guard LLM for "unknown" and allow through (only deterministic rules block).
+AGENT_SKIP_GUARD_LLM = os.getenv('AGENT_SKIP_GUARD_LLM', '').lower() in ('1', 'true', 'yes')
+
 # Google Calendar Configuration
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')

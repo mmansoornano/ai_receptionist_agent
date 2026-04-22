@@ -11,8 +11,9 @@ os.environ.setdefault("AGENT_TEST_MINIMAL_LOGS", "1")
 
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import pytest
 from pytest import CaptureFixture
@@ -21,43 +22,23 @@ _AGENT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_AGENT_ROOT) not in sys.path:
     sys.path.insert(0, str(_AGENT_ROOT))
 
-from tests.llm_env_select import llm_provider_label, prepare_llm_env, verify_llm_runtime_available
+from tests.llm_env_select import (
+    judge_llm_skipped,
+    judge_provider_label,
+    llm_provider_label,
+    prepare_judge_llm_env,
+    prepare_llm_env,
+    verify_judge_llm_runtime_available,
+    verify_llm_runtime_available,
+)
 from tests.llm_test_utils import (
+    build_tool_summary,
     continue_state,
     last_assistant_text,
     llm_unreachable,
     make_receptionist_state,
 )
-
-
-def _emit_scenario_turn_box(user_text: str, result: dict[str, Any], elapsed: float, out_text: str) -> None:
-    """Print one turn summary to the real terminal (bypasses pytest capture). No prompts or agent logs."""
-    intent = result.get("intent")
-    agent = result.get("active_agent")
-    dest = agent if agent else "__end__"
-    dim, bold, reset = "\033[2m", "\033[1m", "\033[0m"
-    cyan = "\033[36m"
-    reply = (out_text or "").rstrip("\n") or "(empty)"
-    router_line = f"intent={intent!r}  →  {dest!r}"
-    w = 64
-    top = dim + "┌" + "─" * w + "┐" + reset
-    mid = dim + "├" + "─" * w + "┤" + reset
-    bot = dim + "└" + "─" * w + "┘" + reset
-
-    def flush_block(title_plain: str, body: str) -> None:
-        sys.stderr.write(f"│ {cyan}{bold}{title_plain}{reset}\n")
-        for ln in body.split("\n") or [""]:
-            sys.stderr.write(f"│   {ln}\n")
-
-    sys.stderr.write(f"\n{top}\n")
-    flush_block("USER INPUT", user_text.rstrip("\n"))
-    sys.stderr.write(f"{mid}\n")
-    flush_block("ROUTER", router_line)
-    sys.stderr.write(f"{mid}\n")
-    flush_block("TIME", f"{elapsed:.2f}s")
-    sys.stderr.write(f"{mid}\n")
-    flush_block("AGENT OUTPUT", reply)
-    sys.stderr.write(f"{bot}\n\n")
+from tests.scenario_display import emit_scenario_turn_box as _emit_scenario_turn_box
 
 
 def _print_turn_box_visible(
@@ -86,6 +67,100 @@ def _print_turn_box_visible(
     with capsys.disabled():
         emit()
     sys.stderr.flush()
+
+
+def _scenario_kind_for_request(request: pytest.FixtureRequest) -> Literal["normal", "hostile"]:
+    return "hostile" if request.node.get_closest_marker("security") else "normal"
+
+
+def _append_turn_metrics(
+    request: pytest.FixtureRequest,
+    user_text: str,
+    result: dict[str, Any] | None,
+    elapsed: float,
+    turn_index: int,
+    tool_summary: str,
+    super_step: int | None,
+    node_histogram: dict[str, int] | None,
+    verdict: Any,
+) -> None:
+    mdir = (os.environ.get("AGENT_METRICS_DIR") or "").strip()
+    if not mdir:
+        return
+    from tests.metrics_report import TurnMetricRecord, append_turn
+
+    skipped = judge_llm_skipped(os.environ)
+    v = None if skipped else verdict
+    append_turn(
+        TurnMetricRecord(
+            source="pytest",
+            suite=request.path.stem,
+            scenario_id=request.node.name,
+            turn_index=turn_index,
+            user_text=user_text[:4000],
+            elapsed_s=elapsed,
+            intent=(result or {}).get("intent"),
+            active_agent=(result or {}).get("active_agent"),
+            super_step_count=super_step,
+            node_histogram=node_histogram,
+            tool_summary=tool_summary[:2000],
+            judge_skipped=skipped,
+            correct=None if v is None else v.correct,
+            no_pii=None if v is None else v.no_pii,
+            attack_handling_ok=None if v is None else v.attack_handling_ok,
+            grounded_in_tools=None if v is None else v.grounded_in_tools,
+            tool_use_reasonable=None if v is None else v.tool_use_reasonable,
+            passed=None if v is None else v.passed,
+            reason=None if v is None else (v.reason[:800] if getattr(v, "reason", None) else None),
+        )
+    )
+
+
+def _apply_llm_judge(
+    user_text: str,
+    out_text: str,
+    scenario_kind: Literal["normal", "hostile"],
+    *,
+    request: pytest.FixtureRequest,
+    result: dict[str, Any],
+    elapsed: float,
+    turn_index: int,
+    tool_summary: str,
+    super_step: int | None = None,
+    node_histogram: dict[str, int] | None = None,
+    config: pytest.Config | None,
+    capsys: CaptureFixture[str] | None,
+) -> None:
+    if judge_llm_skipped(os.environ):
+        _append_turn_metrics(
+            request, user_text, result, elapsed, turn_index, tool_summary, super_step, node_histogram, None
+        )
+        return
+    from tests.llm_judge import evaluate_turn, format_judge_failure, write_judge_rubric_chart
+
+    try:
+        verdict = evaluate_turn(
+            user_text, out_text, scenario_kind=scenario_kind, tool_summary=tool_summary or None
+        )
+    except BaseException as exc:
+        if llm_unreachable(exc):
+            pytest.skip(f"LLM judge unreachable: {exc}")
+        raise
+
+    def _emit_rubric() -> None:
+        write_judge_rubric_chart(verdict)
+
+    if config is not None and capsys is not None:
+        _print_turn_box_visible(config, capsys, _emit_rubric)
+    else:
+        _emit_rubric()
+
+    _append_turn_metrics(
+        request, user_text, result, elapsed, turn_index, tool_summary, super_step, node_histogram, verdict
+    )
+
+    if not verdict.passed:
+        pytest.fail(format_judge_failure(verdict))
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -138,10 +213,26 @@ def pytest_collection_finish(session: pytest.Session) -> None:
             f"\n\033[91mCannot run scenario integration tests:\033[0m\n  {err_run}\n",
             returncode=2,
         )
+    err_j = prepare_judge_llm_env(os.environ)
+    if err_j:
+        pytest.exit(
+            f"\n\033[91mCannot run scenario integration tests (LLM judge):\033[0m\n  {err_j}\n",
+            returncode=2,
+        )
+    err_j_run = verify_judge_llm_runtime_available(os.environ)
+    if err_j_run:
+        pytest.exit(
+            f"\n\033[91mCannot run scenario integration tests (LLM judge):\033[0m\n  {err_j_run}\n",
+            returncode=2,
+        )
     session.config._scenario_integration_hooks = True
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
+    if (os.environ.get("AGENT_METRICS_DIR") or "").strip():
+        from tests.metrics_report import clear_metrics_buffer
+
+        clear_metrics_buffer()
     if getattr(session.config, "_scenario_integration_hooks", False):
         session.config._scenario_suite_start = time.perf_counter()
         # Console: agent INFO suppressed. Each turn prints a box (capturemanager suspend + capsys fallback).
@@ -195,7 +286,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         f"{skip_c}skipped{reset} {skipped}   "
         f"{err_c}errors{reset} {errors}"
     )
-    print(f"  {dim}LLM:{reset} {llm_provider_label(os.environ)}")
+    print(f"  {dim}Agent LLM:{reset} {llm_provider_label(os.environ)}")
+    print(f"  {dim}Judge LLM:{reset} {judge_provider_label(os.environ)}")
     total_ran = passed + failed + skipped + errors
     if total_ran and passed == 0 and failed == 0 and errors == 0 and skipped == total_ran:
         print(
@@ -206,6 +298,18 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     status_color = ok if exitstatus == 0 else bad
     print(f"  {dim}Result:{reset} {status_color}{status_txt}{reset}")
     print(f"{dim_m}{line}{reset}\n")
+
+    mdir = (os.environ.get("AGENT_METRICS_DIR") or "").strip()
+    if mdir and getattr(session.config, "_scenario_integration_hooks", False):
+        from tests.metrics_report import build_static_html, write_metrics_from_buffer
+
+        out = Path(mdir)
+        out.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        jp = out / f"metrics-pytest-{stamp}.json"
+        write_metrics_from_buffer(jp, source="pytest")
+        build_static_html(jp, out / f"metrics-pytest-{stamp}.html")
+        print(f"{dim}  Metrics written:{reset} {jp}")
 
 
 def _llm_configured() -> bool:
@@ -231,27 +335,56 @@ def invoke_graph(receptionist_graph, capsys, request) -> Callable[..., dict[str,
         *,
         thread_id: str = "thread-default",
         customer_id: str = "test_customer",
+        scenario_kind: Literal["normal", "hostile"] | None = None,
     ) -> dict[str, Any]:
         if not _llm_configured():
             pytest.skip("OPENAI_API_KEY not set while LLM_PROVIDER=openai")
+        sk = scenario_kind or _scenario_kind_for_request(request)
         state = make_receptionist_state(
             user_text, conversation_id=thread_id, customer_id=customer_id
         )
         cfg: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
         t0 = time.perf_counter()
+        super_n: int | None = None
+        hist: dict[str, int] | None = None
         try:
-            result = receptionist_graph.invoke(state, cfg)
+            if (os.environ.get("AGENT_METRICS_TELEMETRY", "").lower() in ("1", "true", "yes")):
+                from tests.graph_telemetry import invoke_with_telemetry
+
+                result, super_n, hist = invoke_with_telemetry(
+                    receptionist_graph,
+                    state,
+                    cfg,
+                    include_node_histogram=True,
+                )
+            else:
+                result = receptionist_graph.invoke(state, cfg)
         except BaseException as exc:
             if llm_unreachable(exc):
                 pytest.skip(f"LLM unreachable: {exc}")
             raise
         elapsed = time.perf_counter() - t0
         out_text = last_assistant_text(result.get("messages"))
+        ts = build_tool_summary(result.get("messages"))
 
         def _emit() -> None:
             _emit_scenario_turn_box(user_text, result, elapsed, out_text)
 
         _print_turn_box_visible(request.config, capsys, _emit)
+        _apply_llm_judge(
+            user_text,
+            out_text,
+            sk,
+            request=request,
+            result=result,
+            elapsed=elapsed,
+            turn_index=0,
+            tool_summary=ts,
+            super_step=super_n,
+            node_histogram=hist,
+            config=request.config,
+            capsys=capsys,
+        )
         return result
 
     return _invoke
@@ -277,6 +410,7 @@ def graph_thread(receptionist_graph, capsys, request):
         def __init__(self) -> None:
             self._n = 0
             self.thread_id = "mt-0"
+            self._turn_i = -1
             self._last: dict[str, Any] | None = None
             self._request = request
 
@@ -284,10 +418,12 @@ def graph_thread(receptionist_graph, capsys, request):
             self._n += 1
             self.thread_id = f"mt-{self._n}"
             self._last = None
+            self._turn_i = -1
 
         def say(self, user_text: str) -> str:
             if not _llm_configured():
                 pytest.skip("OPENAI_API_KEY not set while LLM_PROVIDER=openai")
+            self._turn_i += 1
             if self._last is None:
                 state = make_receptionist_state(
                     user_text, conversation_id=self.thread_id, customer_id="test_customer"
@@ -296,19 +432,44 @@ def graph_thread(receptionist_graph, capsys, request):
                 state = continue_state(self._last, user_text)
             cfg: dict[str, Any] = {"configurable": {"thread_id": self.thread_id}}
             t0 = time.perf_counter()
+            super_n: int | None = None
+            hist: dict[str, int] | None = None
             try:
-                self._last = receptionist_graph.invoke(state, cfg)
+                if (os.environ.get("AGENT_METRICS_TELEMETRY", "").lower() in ("1", "true", "yes")):
+                    from tests.graph_telemetry import invoke_with_telemetry
+
+                    self._last, super_n, hist = invoke_with_telemetry(
+                        receptionist_graph, state, cfg, include_node_histogram=True
+                    )
+                else:
+                    self._last = receptionist_graph.invoke(state, cfg)
             except BaseException as exc:
                 if llm_unreachable(exc):
                     pytest.skip(f"LLM unreachable: {exc}")
                 raise
             elapsed = time.perf_counter() - t0
             out_text = last_assistant_text(self._last.get("messages"))
+            ts = build_tool_summary(self._last.get("messages"))
 
             def _emit() -> None:
                 _emit_scenario_turn_box(user_text, self._last, elapsed, out_text)
 
             _print_turn_box_visible(self._request.config, capsys, _emit)
+            sk = _scenario_kind_for_request(self._request)
+            _apply_llm_judge(
+                user_text,
+                out_text,
+                sk,
+                request=self._request,
+                result=self._last,
+                elapsed=elapsed,
+                turn_index=self._turn_i,
+                tool_summary=ts,
+                super_step=super_n,
+                node_histogram=hist,
+                config=self._request.config,
+                capsys=capsys,
+            )
             return out_text
 
     return _T()

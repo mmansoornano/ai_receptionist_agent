@@ -1,0 +1,146 @@
+<div class="cmd-builder" id="cmd-builder" role="region" aria-label="Test command builder">
+  <p class="cmd-builder-lead">Choose what to run below. The command is for your <strong>local</strong> clone — it starts with <code>cd AI_receptionist_agent &&</code> so you can paste from the monorepo root.</p>
+
+  <div class="cmd-builder-grid">
+    <div class="cmd-field">
+      <label for="cmd-goal">What do you want to run?</label>
+      <select id="cmd-goal" class="cmd-select">
+        <option value="unit">Fast unit tests (default pytest; no LLM integration)</option>
+        <option value="pytest-marker">Pytest — one integration marker (conversation, ordering, …)</option>
+        <option value="pytest-all-int">Pytest — all integration tests in <code>tests/integration/</code></option>
+        <option value="scenario-runner"><code>run_scenario_tests.py</code> — LLM scenario suite</option>
+        <option value="yaml">YAML suite — <code>run_yaml_scenarios.py</code></option>
+        <option value="backend-int">Pytest — live Django HTTP tools only</option>
+      </select>
+    </div>
+
+    <div class="cmd-field cmd-panel" id="cmd-panel-marker" hidden>
+      <label for="cmd-marker">Scenario marker</label>
+      <select id="cmd-marker" class="cmd-select">
+        <option value="conversation">conversation</option>
+        <option value="ordering">ordering</option>
+        <option value="payment">payment</option>
+        <option value="cancellation">cancellation</option>
+        <option value="security">security</option>
+      </select>
+    </div>
+
+    <div class="cmd-field cmd-panel" id="cmd-panel-suite" hidden>
+      <label for="cmd-suite">Suite</label>
+      <select id="cmd-suite" class="cmd-select">
+        <option value="all">all</option>
+        <option value="flows">flows</option>
+        <option value="conversation">conversation</option>
+        <option value="ordering">ordering</option>
+        <option value="payment">payment</option>
+        <option value="cancellation">cancellation</option>
+        <option value="security">security</option>
+      </select>
+    </div>
+
+    <div class="cmd-field cmd-panel" id="cmd-panel-yaml" hidden>
+      <label for="cmd-yaml-path">Path to YAML file (from repo root)</label>
+      <input type="text" id="cmd-yaml-path" class="cmd-input" value="tests/scenarios/example_scenarios.yml" spellcheck="false" autocomplete="off" />
+    </div>
+
+    <div class="cmd-field cmd-row-checks">
+      <label class="cmd-check"><input type="checkbox" id="cmd-verbose" checked /> Verbose (<code>-v</code>) for pytest</label>
+      <label class="cmd-check" id="cmd-live-wrap"><input type="checkbox" id="cmd-live" /> Live logs (<code>--live-logs</code>) for scenario runner</label>
+    </div>
+  </div>
+
+  <div class="cmd-out-wrap">
+    <label for="cmd-output" class="cmd-out-label">Generated command</label>
+    <pre class="cmd-output" id="cmd-output" role="status"></pre>
+    <button type="button" class="cmd-copy-btn" id="cmd-copy">Copy command</button>
+    <p class="cmd-hint" id="cmd-copy-msg" aria-live="polite"></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var goal = document.getElementById("cmd-goal");
+  var marker = document.getElementById("cmd-marker");
+  var suite = document.getElementById("cmd-suite");
+  var yamlPath = document.getElementById("cmd-yaml-path");
+  var verbose = document.getElementById("cmd-verbose");
+  var live = document.getElementById("cmd-live");
+  var out = document.getElementById("cmd-output");
+  var copyBtn = document.getElementById("cmd-copy");
+  var copyMsg = document.getElementById("cmd-copy-msg");
+  var panelMarker = document.getElementById("cmd-panel-marker");
+  var panelSuite = document.getElementById("cmd-panel-suite");
+  var panelYaml = document.getElementById("cmd-panel-yaml");
+  var liveWrap = document.getElementById("cmd-live-wrap");
+
+  function prefix() {
+    return "cd AI_receptionist_agent && ";
+  }
+
+  function rebuild() {
+    var g = goal.value;
+    var v = verbose.checked ? " -v" : "";
+    var line = "";
+
+    panelMarker.hidden = g !== "pytest-marker";
+    panelSuite.hidden = g !== "scenario-runner";
+    panelYaml.hidden = g !== "yaml";
+    liveWrap.style.display = g === "scenario-runner" ? "" : "none";
+
+    if (g === "unit") {
+      line = prefix() + "python -m pytest";
+    } else if (g === "pytest-marker") {
+      var m = marker.value;
+      line =
+        prefix() +
+        'python -m pytest tests/integration -m "integration and ' +
+        m +
+        '"' +
+        v +
+        " --tb=line";
+    } else if (g === "pytest-all-int") {
+      line = prefix() + "python -m pytest tests/integration -m integration" + v + " --tb=line";
+    } else if (g === "scenario-runner") {
+      var s = suite.value;
+      var extra = live.checked ? " --live-logs" : "";
+      line = prefix() + "python tests/run_scenario_tests.py " + s + extra;
+    } else if (g === "yaml") {
+      var p = (yamlPath.value || "tests/scenarios/example_scenarios.yml").trim();
+      line = prefix() + "python tests/run_yaml_scenarios.py " + p;
+    } else if (g === "backend-int") {
+      line =
+        prefix() +
+        "python -m pytest -m integration tests/test_backend_integration.py" +
+        v +
+        " --tb=line";
+    }
+
+    out.textContent = line;
+    copyMsg.textContent = "";
+  }
+
+  goal.addEventListener("change", rebuild);
+  marker.addEventListener("change", rebuild);
+  suite.addEventListener("change", rebuild);
+  yamlPath.addEventListener("input", rebuild);
+  verbose.addEventListener("change", rebuild);
+  live.addEventListener("change", rebuild);
+
+  copyBtn.addEventListener("click", function () {
+    var text = out.textContent || "";
+    function ok() {
+      copyMsg.textContent = "Copied to clipboard.";
+    }
+    function fail() {
+      copyMsg.textContent = "Select the command above and copy manually (⌘C / Ctrl+C).";
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok).catch(fail);
+    } else {
+      fail();
+    }
+  });
+
+  rebuild();
+})();
+</script>

@@ -1,0 +1,68 @@
+# Input guard: deterministic layer. LLM policy runs when message is not allowlisted and not blocked.
+
+simple_greeting_allowlist:
+  - "hi"
+  - "hi!"
+  - "hello"
+  - "hello!"
+  - "hey"
+  - "hey!"
+  - "hey there"
+  - "hey there!"
+  - "good morning"
+  - "good afternoon"
+  - "good evening"
+  - "greetings"
+  - "sup"
+  - "howdy"
+  - "yo"
+  - "hiya"
+
+substring_blocklist:
+  - "ignore all previous"
+  - "ignore previous instructions"
+  - "system prompt"
+  - "system override"
+  - "reveal your"
+  - "print the exact"
+  - "you are now"
+  - "you're now"
+  - "jailbreak"
+  - "do anything now"
+  - "api key"
+  - "hidden system"
+  - "forget the store"
+  - "treating physician"
+  - "prescription"
+  - "adderall"
+  - "write a prescription"
+  - "book me a flight"
+  - "travel agent"
+  - "boarding pass"
+  - "pnr"
+  - "pepperoni pizza"
+  - "sushi"
+  - "spicy tuna"
+  - "doordash"
+  - "uber eats"
+  - "dan "
+
+# Pepperoni + pizza, not bare "pepperoni" (could appear in other contexts)
+regex_blocklist:
+  - '(?i)pepperoni\\s+(pizza|pizzas)'
+  - '(?i)(pizza|pizzas)\\s+.*pepperoni'
+
+refusal_templates:
+  default: >-
+    I can only help with our protein bar store — products, cart, shipping, and policies in English.
+    Tell me what you're looking for.
+  meta: >-
+    I can't share internal instructions or system details. I can help with our protein bar shop — products, cart, shipping, or policies. What would you like?
+  medical: >-
+    I can't provide prescriptions or medical advice. I can only help with our protein bar products and orders. Would you like to see what we carry?
+  food_service: >-
+    We only sell items from our own catalog (protein bars, cookies, granola, cereals, gift boxes) — not restaurant meals. Would you like to see what's in stock?
+  travel: >-
+    We don't book flights or issue PNRs or travel confirmations — we only sell our own products. I can help with protein bars, your cart, or delivery. What do you need?
+  store_attack: >-
+    I'm only able to help with this protein bar shop. I can't process unrelated food orders. I can show our products or help with your cart. What do you need?

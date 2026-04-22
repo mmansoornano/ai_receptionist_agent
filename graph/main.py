@@ -2,6 +2,7 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
 from graph.state import ReceptionistState
+from graph.input_guard import input_guard_node
 from graph.router import router_agent
 from graph.qa_agent import qa_agent, qa_tool_node
 from graph.ordering_agent import ordering_agent, ordering_tool_node
@@ -95,6 +96,7 @@ def create_receptionist_graph():
     # Add nodes - with Command, nodes can specify next node dynamically
     # The actual routing is handled by Command returns from nodes
     # Visualization will automatically show destinations based on Command returns
+    workflow.add_node("input_guard", input_guard_node)
     workflow.add_node("router", router_agent)
     workflow.add_node("qa_agent", qa_agent)
     workflow.add_node("ordering_agent", ordering_agent)
@@ -103,7 +105,7 @@ def create_receptionist_graph():
     workflow.add_node("tools", call_tools)
     
     # Add initial entry point - only edge needed since Command handles all other routing
-    workflow.add_edge(START, "router")
+    workflow.add_edge(START, "input_guard")
     
     # Compile graph with checkpointer for state persistence between API calls
     from langgraph.checkpoint.memory import MemorySaver

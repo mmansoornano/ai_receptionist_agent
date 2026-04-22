@@ -87,7 +87,7 @@ class ReceptionistState(TypedDict):
     - Ensures conversation history can show up to 10+ messages for context
     """
     messages: Annotated[list[BaseMessage], sliding_window_messages]
-    intent: Optional[str]  # "product_inquiry", "ordering", "payment", "cancellation", "general_qa"
+    intent: Optional[str]  # e.g. product_inquiry, ordering, payment, cancellation, general_qa, greeting, guardrail_refuse
     conversation_context: Optional[str]  # Summary or key context from conversation history for efficient memory
     active_agent: Optional[str]  # Track current active agent node name for stateful routing
     customer_info: Optional[Dict]

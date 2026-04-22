@@ -165,7 +165,7 @@ Once the server is running, you can access:
 
 ## Configuration
 
-Use **`.env`** in this folder (see **Installation**). Common keys: **`LLM_PROVIDER`** (`ollama` | `openai`), **`OLLAMA_*`**, **`OPENAI_API_KEY`**, **`OPENAI_MODEL`**, **`BACKEND_API_BASE_URL`**, **`AGENT_API_PORT`**, **`CORS_ORIGINS`**. Optional dependency pinning notes: [`docs/dependencies.md`](docs/dependencies.md).
+Use **`.env`** in this folder (see **Installation**). Common keys: **`LLM_PROVIDER`** (`ollama` | `openai`), **`OLLAMA_*`**, **`OPENAI_API_KEY`**, **`OPENAI_MODEL`**, **`GUARD_*`** / **`AGENT_SKIP_GUARD_LLM`** (pre-router input guard), **`JUDGE_*`** / **`AGENT_SKIP_LLM_JUDGE`** (scenario LLM judge), **`BACKEND_API_BASE_URL`**, **`AGENT_API_PORT`**, **`CORS_ORIGINS`**. Optional dependency pinning notes: [`docs/dependencies.md`](docs/dependencies.md). Input guard behavior: [`docs/guardrails.md`](docs/guardrails.md).
 
 ## Testing
 
@@ -175,6 +175,7 @@ Run commands from **`AI_receptionist_agent/`** (where `pytest.ini` and `.env` li
 |------|--------|---------|
 | **Fast (default) tests** | Python + deps | `python -m pytest` or `python tests/run_all_tests.py` |
 | **LLM scenarios** | Ollama **or** `OPENAI_API_KEY` in `.env` | `python tests/run_scenario_tests.py [<suite>]` |
+| **YAML scenarios** | Same + judge LLM | `python tests/run_yaml_scenarios.py [tests/scenarios/your.yml]` — see `tests/scenarios/README.md` |
 | **Live Django API** | Backend up + env | `python -m pytest -m integration tests/test_backend_integration.py` |
 
 `pytest.ini` defaults to **`-m "not integration"`**, so plain `pytest` does not run LLM or live-backend integration tests.
@@ -191,6 +192,8 @@ python tests/run_scenario_tests.py --live-logs conversation  # optional: stream 
 ```
 
 **Provider selection (tests):** `tests/llm_env_select.py` — if `LLM_PROVIDER` is unset or `ollama`, probes Ollama; if down and **`OPENAI_API_KEY`** is set, switches to OpenAI for that run. If `LLM_PROVIDER=openai`, a key is required. No LLM → exit **2** after collection. The **running app** (`config.py`) does **not** auto-fallback; only tests do.
+
+**LLM judge (always on for `tests/integration/`):** after each graph turn, a judge model scores the reply on three rubrics (**`correct`**, **`no_pii`**, **`attack_handling_ok`**). A **terminal rubric chart** (bars + overall PASS/FAIL) prints after every judge call; failing replies then fail the test with a short reason and suggested user prompts. Optional env: **`JUDGE_LLM_PROVIDER`**, **`JUDGE_OLLAMA_MODEL`**, **`JUDGE_OPENAI_MODEL`**; break-glass skip: **`AGENT_SKIP_LLM_JUDGE=1`**. Rubric mapping and references: [`docs/testing.md`](docs/testing.md) → *LLM-as-judge rubric chart*.
 
 **pytest:** use `-m "integration and <marker>"` (e.g. `conversation`). Example:
 

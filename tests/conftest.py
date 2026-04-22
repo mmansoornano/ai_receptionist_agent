@@ -29,7 +29,17 @@ _UNSET = object()
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Quiet third-party INFO that looks like prompts (LangChain / httpx) during tests."""
+    """Reset caches before collection imports agent code; quiet third-party loggers."""
+    if not getattr(config, "_agent_test_cache_done", False):
+        config._agent_test_cache_done = True
+        if not getattr(config.option, "collectonly", False):
+            try:
+                from tests.cache_reset import clear_test_artifacts
+
+                clear_test_artifacts()
+            except Exception as exc:  # pragma: no cover - defensive
+                print(f"Warning: tests.cache_reset.clear_test_artifacts failed: {exc}", file=sys.stderr)
+
     if os.getenv("AGENT_LOG_FULL_PROMPTS", "").lower() in ("1", "true", "yes"):
         return
     import logging

@@ -41,7 +41,7 @@ def qa_agent(state: ReceptionistState) -> Command | ReceptionistState:
     # ToolMessages must stay paired with any AIMessage that has tool_calls (OpenAI Chat API rule).
     filtered_messages = filter_messages_for_agent(messages, include_system=True, include_tool_results=True)
     last_human_message = get_last_human_message(messages)
-    
+
     # Get prompt and create system message
     qa_prompt = get_prompt("qa_agent")
     

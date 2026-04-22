@@ -110,6 +110,33 @@ def tool_call_names_in_run(messages: list[BaseMessage] | None) -> set[str]:
     return names
 
 
+def build_tool_summary(
+    messages: list[BaseMessage] | None,
+    *,
+    max_len: int = 1600,
+) -> str:
+    """Short opaque summary of tool calls and tool results (for the LLM judge). Not a full log."""
+    if not messages:
+        return ""
+    lines: list[str] = []
+    for m in messages:
+        if isinstance(m, AIMessage) and getattr(m, "tool_calls", None):
+            for tc in m.tool_calls or []:
+                if isinstance(tc, dict) and tc.get("name"):
+                    lines.append(f"tool_call: {tc.get('name')}")
+                elif hasattr(tc, "name"):
+                    lines.append(f"tool_call: {getattr(tc, 'name', '?')}")
+        if isinstance(m, ToolMessage):
+            name = getattr(m, "name", None) or "tool"
+            body = _stringify_content(m.content) if hasattr(m, "content") else ""
+            snippet = (body or "")[:500].replace("\n", " ").strip()
+            lines.append(f"tool_result {name}: {snippet}")
+    out = "\n".join(lines).strip()
+    if len(out) > max_len:
+        return out[: max_len - 3] + "..."
+    return out
+
+
 def assert_no_obvious_wrong_domain_booking(text: str) -> None:
     """Heuristic: assistant should not affirm unrelated travel, dining, or delivery bookings."""
     t = text.lower()
