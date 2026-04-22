@@ -1,105 +1,75 @@
-"""Test agent flow with backend integration."""
-import sys
-from pathlib import Path
+"""Smoke integration tests for the full receptionist graph."""
+from __future__ import annotations
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+import os
+from typing import Any
 
-from graph.main import receptionist_graph
-from graph.state import ReceptionistState
+import pytest
 from langchain_core.messages import HumanMessage
-import json
+
+from tests.llm_test_utils import last_assistant_text, llm_unreachable, make_receptionist_state
+
+pytestmark = pytest.mark.integration
 
 
-def test_agent_flow():
-    """Test complete agent flow."""
-    print("=" * 60)
-    print("Agent Flow Integration Test")
-    print("=" * 60)
-    print()
-    
-    # Test 1: Product Inquiry
-    print("Test 1: Product Inquiry")
-    print("-" * 60)
-    state1: ReceptionistState = {
-        "messages": [HumanMessage(content="What is the price of protein bars?")],
-        "intent": None,
-        "conversation_context": None,
-        "customer_info": None,
-        "cart_data": None,
-        "order_data": None,
-        "payment_data": None,
-        "channel": "sms",
-        "language": "en",
-        "conversation_id": "test_conv_1",
-        "customer_id": "test_customer"
-    }
-    
+def _llm_configured() -> bool:
+    provider = (os.getenv("LLM_PROVIDER") or "ollama").lower().strip()
+    if provider == "openai":
+        return bool(os.getenv("OPENAI_API_KEY"))
+    return True
+
+
+@pytest.fixture(scope="module")
+def receptionist_graph():
+    from graph.main import receptionist_graph as graph
+
+    return graph
+
+
+@pytest.fixture
+def base_state():
+    def _make(
+        content: str,
+        *,
+        conversation_id: str = "test_conv",
+        customer_id: str = "test_customer",
+    ):
+        return make_receptionist_state(
+            content, conversation_id=conversation_id, customer_id=customer_id
+        )
+
+    return _make
+
+
+@pytest.mark.parametrize(
+    "user_message",
+    [
+        "What is the price of protein bars?",
+        "Add 2 white chocolate protein bars to my cart",
+        "Show me my cart",
+    ],
+)
+def test_receptionist_graph_invoke_returns_assistant_message(
+    receptionist_graph, base_state, user_message: str
+):
+    if not _llm_configured():
+        pytest.skip("OPENAI_API_KEY not set for LLM_PROVIDER=openai")
+
+    conv_id = f"test_conv_{abs(hash(user_message)) % 10_000}"
+    state = base_state(user_message, conversation_id=conv_id)
+    config: dict[str, Any] = {"configurable": {"thread_id": conv_id}}
     try:
-        result1 = receptionist_graph.invoke(state1)
-        last_message = result1["messages"][-1]
-        print(f"Response: {last_message.content[:200]}...")
-        print("✓ Product inquiry test passed")
-    except Exception as e:
-        print(f"✗ Product inquiry test failed: {e}")
-    print()
-    
-    # Test 2: Ordering (Add to Cart)
-    print("Test 2: Ordering - Add to Cart")
-    print("-" * 60)
-    state2: ReceptionistState = {
-        "messages": [HumanMessage(content="Add 2 white chocolate protein bars to my cart")],
-        "intent": None,
-        "conversation_context": None,
-        "customer_info": None,
-        "cart_data": None,
-        "order_data": None,
-        "payment_data": None,
-        "channel": "sms",
-        "language": "en",
-        "conversation_id": "test_conv_2",
-        "customer_id": "test_customer"
-    }
-    
-    try:
-        result2 = receptionist_graph.invoke(state2)
-        last_message = result2["messages"][-1]
-        print(f"Response: {last_message.content[:200]}...")
-        print("✓ Ordering test passed")
-    except Exception as e:
-        print(f"✗ Ordering test failed: {e}")
-    print()
-    
-    # Test 3: View Cart
-    print("Test 3: View Cart")
-    print("-" * 60)
-    state3: ReceptionistState = {
-        "messages": [HumanMessage(content="Show me my cart")],
-        "intent": None,
-        "conversation_context": None,
-        "customer_info": None,
-        "cart_data": None,
-        "order_data": None,
-        "payment_data": None,
-        "channel": "sms",
-        "language": "en",
-        "conversation_id": "test_conv_3",
-        "customer_id": "test_customer"
-    }
-    
-    try:
-        result3 = receptionist_graph.invoke(state3)
-        last_message = result3["messages"][-1]
-        print(f"Response: {last_message.content[:200]}...")
-        print("✓ View cart test passed")
-    except Exception as e:
-        print(f"✗ View cart test failed: {e}")
-    print()
-    
-    print("=" * 60)
-    print("Agent Flow Tests Complete")
-    print("=" * 60)
+        result = receptionist_graph.invoke(state, config)
+    except BaseException as exc:
+        if llm_unreachable(exc):
+            pytest.skip(f"LLM endpoint unreachable: {exc}")
+        raise
+
+    assert "messages" in result
+    assert result["messages"], "expected non-empty messages"
+    text = last_assistant_text(result["messages"])
+    assert len(text) >= 8, "expected last assistant message with visible text"
 
 
 if __name__ == "__main__":
-    test_agent_flow()
+    raise SystemExit(pytest.main([__file__, "-v", "-s", "-m", "integration"]))

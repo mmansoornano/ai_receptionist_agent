@@ -3,7 +3,9 @@ langgraph>=0.2.0
 langchain>=0.1.0
 langchain-openai>=0.1.0
 langchain-ollama>=0.1.0
-langchain-core>=0.1.0
+langchain-core>=0.3.84,<0.4.0
+langchain-text-splitters>=0.2.0  # Used by services.rag_service
+langchain-community>=0.2.0  # Used by services.rag_service (FAISS)
 
 # LLM Providers
 openai>=1.0.0

@@ -28,8 +28,8 @@ def payment_agent(state: ReceptionistState) -> Command | ReceptionistState:
     messages = state.get("messages", [])
     language = state.get("language", DEFAULT_LANGUAGE)
     
-    # Filter messages before processing (excludes ToolMessages and SystemMessages by default)
-    filtered_messages = filter_messages_for_agent(messages, include_system=True, include_tool_results=False)
+    # Keep ToolMessages with any AIMessage that has tool_calls (OpenAI Chat API requirement).
+    filtered_messages = filter_messages_for_agent(messages, include_system=True, include_tool_results=True)
     last_human_message = get_last_human_message(messages)
     
     # Get prompt and create system message

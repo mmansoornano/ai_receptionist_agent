@@ -60,26 +60,11 @@ def call_tools(state: ReceptionistState) -> Command | ReceptionistState:
         }
     
     log_graph_flow("tools", "Exiting Node", {"intent": intent})
-    
-    # #region debug log
-    import json
-    import time
-    try:
-        with open("/Users/home/Documents/Convsol/Agent/AI Receptionist/AI_receptionist_agent/.cursor/debug.log", "a") as f:
-            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"main.py:53","message":"AFTER tools - routing decision","data":{"active_agent_from_state":result_state.get("active_agent"),"intent":result_state.get("intent"),"has_active_agent":bool(result_state.get("active_agent")),"original_active_agent":active_agent,"original_intent":original_intent},"timestamp":int(time.time()*1000)}) + "\n")
-    except: pass
-    # #endregion
-    
+
     # Use Command to route back to the active agent after tools execute
     # CRITICAL: Include the updated messages (with ToolMessages) in the Command update
     active_agent = result_state.get("active_agent")
     if active_agent:
-        # #region debug log
-        try:
-            with open("/Users/home/Documents/Convsol/Agent/AI Receptionist/AI_receptionist_agent/.cursor/debug.log", "a") as f:
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"main.py:59","message":"Routing via active_agent","data":{"active_agent":active_agent},"timestamp":int(time.time()*1000)}) + "\n")
-        except: pass
-        # #endregion
         # Include messages update so ToolMessages are preserved
         return Command(
             update={"messages": result_state.get("messages", [])},
@@ -94,14 +79,7 @@ def call_tools(state: ReceptionistState) -> Command | ReceptionistState:
         "cancellation": "cancellation_agent"
     }
     next_agent = agent_mapping.get(intent, "qa_agent")
-    
-    # #region debug log
-    try:
-        with open("/Users/home/Documents/Convsol/Agent/AI Receptionist/AI_receptionist_agent/.cursor/debug.log", "a") as f:
-            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"main.py:70","message":"Fallback routing via intent","data":{"intent":intent,"next_agent":next_agent},"timestamp":int(time.time()*1000)}) + "\n")
-    except: pass
-    # #endregion
-    
+
     # Include messages update so ToolMessages are preserved
     return Command(
         update={"messages": result_state.get("messages", [])},

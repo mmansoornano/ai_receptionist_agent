@@ -1,5 +1,6 @@
 """Configuration for the agent system - loads from .env file."""
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -11,12 +12,16 @@ else:
     # Fallback to system environment
     load_dotenv()
 
+# macOS: PyTorch + faiss-cpu often both link libomp; RAG/FAISS search can abort without this.
+if sys.platform == "darwin":
+    os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 # LLM Provider Configuration
 LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'ollama').lower()
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.1:8b')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4-turbo-preview')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 
 # Google Calendar Configuration
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
