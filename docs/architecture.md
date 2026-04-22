@@ -15,8 +15,8 @@ This service is the **conversational orchestration layer**. It does **not** own 
 ## Architecture diagram
 
 <figure class="doc-figure">
-  <img src="{{ '/assets/img/agent-architecture.svg' | relative_url }}" width="920" height="400" alt="Diagram: channels to FastAPI, main.process_message, LangGraph router and agents, tools, and Django backend" loading="lazy" decoding="async" />
-  <figcaption>High-level runtime flow (not every branch or tool). SVG lives in <code>docs/assets/img/</code> — edit the file to tweak the diagram.</figcaption>
+  <img src="{{ site.canonical_docs_url }}/assets/img/agent-architecture.svg" width="920" height="400" alt="Diagram: channels to FastAPI, main.process_message, LangGraph router and agents, tools, and Django backend" loading="lazy" decoding="async" />
+  <figcaption>High-level runtime flow (not every branch or tool). SVG: <code>docs/assets/img/agent-architecture.svg</code>. If this image 404s, set <code>canonical_docs_url</code> in <code>docs/_config.yml</code> to match your GitHub Pages URL.</figcaption>
 </figure>
 
 ## Technology stack

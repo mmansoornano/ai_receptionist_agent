@@ -20,9 +20,9 @@ canonical_docs_url: "https://mmansoornano.github.io/ai_receptionist_agent"  # no
 github_repo: mmansoornano/ai_receptionist_agent
 ```
 
-Nav, home-page cards, and cross-links use **`canonical_docs_url`** so they resolve like **`https://mmansoornano.github.io/ai_receptionist_agent/api.html`** even if a build mis-resolves relative paths. For a local Jekyll preview, temporarily point **`canonical_docs_url`** at your dev origin (for example `http://127.0.0.1:4000/ai_receptionist_agent`).
+Nav, home-page cards, cross-links, and **architecture diagram** `<img>` URLs use **`canonical_docs_url`** so they resolve under the project path (for example **`…/ai_receptionist_agent/assets/img/agent-architecture.svg`**). Plain **`relative_url`** on images can end up as **`/assets/...`** on the wrong host path and **break on GitHub Pages**. For a local Jekyll preview, temporarily point **`canonical_docs_url`** at your dev origin (for example `http://127.0.0.1:4000/ai_receptionist_agent`).
 
-**`relative_url`** is still used for **CSS** under **`/assets/`**, so **`baseurl`** must stay correct for styling.
+**`relative_url`** is still used for **CSS** under **`/assets/css/`**, so **`baseurl`** must stay correct for styling.
 
 ## Enable Pages
 
