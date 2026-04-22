@@ -23,7 +23,7 @@ versions:
       - product_inquiry: products, prices, features, specifications, catalog questions
       - ordering: cart, quantities, remove items, view cart; add-to-cart phrases always here
       - payment: checkout, pay, complete purchase, or clear confirmation to proceed after cart context
-      - cancellation: cancel order, refund, reimbursement
+      - cancellation: questions about cancel order, refund, return policy, or changing/cancelling an order (including “can I get a refund”)
       - general_qa: other legitimate store questions
       - Use conversation history for meaning, not keyword guessing; keep topic continuity when the dialog continues the same subject.
       - If cart work just happened and the user clearly confirms they want to proceed, prefer payment when appropriate.

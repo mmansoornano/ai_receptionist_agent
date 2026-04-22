@@ -11,6 +11,7 @@ os.environ.setdefault("AGENT_TEST_MINIMAL_LOGS", "1")
 
 import sys
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -409,14 +410,23 @@ def graph_thread(receptionist_graph, capsys, request):
     class _T:
         def __init__(self) -> None:
             self._n = 0
-            self.thread_id = "mt-0"
+            self.thread_id = f"mt-init-{uuid.uuid4().hex[:8]}"
+            self._customer_id = f"itest-{uuid.uuid4().hex[:12]}"
             self._turn_i = -1
             self._last: dict[str, Any] | None = None
             self._request = request
 
         def reset(self) -> None:
+            from tests.cache_reset import clear_in_memory_caches_for_new_scenario
+
+            # Fresh prompt/guard/judge in-memory state so the agent does not carry prior test data.
+            clear_in_memory_caches_for_new_scenario()
             self._n += 1
-            self.thread_id = f"mt-{self._n}"
+            # Unique per test: LangGraph checkpointers key on thread_id — reusing mt-1, mt-2
+            # across tests would restore another test's messages and break cart / customer_id.
+            tid = uuid.uuid4().hex[:16]
+            self.thread_id = f"mt-{tid}"
+            self._customer_id = f"itest-{tid}"
             self._last = None
             self._turn_i = -1
 
@@ -426,7 +436,9 @@ def graph_thread(receptionist_graph, capsys, request):
             self._turn_i += 1
             if self._last is None:
                 state = make_receptionist_state(
-                    user_text, conversation_id=self.thread_id, customer_id="test_customer"
+                    user_text,
+                    conversation_id=self.thread_id,
+                    customer_id=self._customer_id,
                 )
             else:
                 state = continue_state(self._last, user_text)

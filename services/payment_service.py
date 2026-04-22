@@ -133,5 +133,5 @@ def create_simple_payment(mobile_number: str, amount: float, transaction_id: Opt
 
 
 def get_customer_service_phone() -> str:
-    """Get customer service phone number for cancellations."""
+    """Customer service phone (order questions; no refund/cancel in chat after baking has started)."""
     return CUSTOMER_SERVICE_PHONE

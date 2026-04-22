@@ -9,15 +9,17 @@ from utils.logger import log_tool_call
 
 @tool
 def submit_order_cancellation(order_id: str, reason: str, customer_phone: str = None) -> str:
-    """Submit order cancellation request to admin.
-    
+    """Submit a staff follow-up request about an order (e.g. rare pre-baking case). Does not guarantee refund.
+
+    Store policy: once baking has started, orders are not cancelled or refunded via this chat.
+
     Args:
-        order_id: Order ID to cancel
-        reason: Cancellation reason
-        customer_phone: Optional customer phone number
-    
+        order_id: Order ID
+        reason: Short reason
+        customer_phone: Optional customer phone
+
     Returns:
-        Cancellation request confirmation message
+        Confirmation that the request was logged, plus how to reach customer service.
     """
     log_tool_call("submit_order_cancellation", {"order_id": order_id, "reason": reason})
     
@@ -25,7 +27,11 @@ def submit_order_cancellation(order_id: str, reason: str, customer_phone: str = 
     
     if result["success"]:
         phone = get_customer_service_number()
-        message = f"Cancellation request submitted successfully (Request ID: {result['request_id']}). For refund and reimbursement, please contact customer service at {phone}."
+        message = (
+            f"Request recorded for staff (Request ID: {result['request_id']}). "
+            f"We do not offer refunds or cancellations after baking has started. "
+            f"For order questions, call customer service at {phone}."
+        )
         log_tool_call("submit_order_cancellation", {"order_id": order_id}, message)
         return message
     else:
@@ -36,15 +42,18 @@ def submit_order_cancellation(order_id: str, reason: str, customer_phone: str = 
 
 @tool
 def get_cancellation_contact_info() -> str:
-    """Get customer service contact information for cancellations and refunds.
+    """Customer service phone for order questions. Policy: no refund or cancel after baking starts.
     
     Returns:
-        Customer service phone number
+        Contact line with phone number
     """
     log_tool_call("get_cancellation_contact_info", {})
     
     phone = get_customer_service_number()
-    message = f"For order cancellations, refunds, and reimbursements, please contact customer service at {phone}."
+    message = (
+        f"Customer service (order questions, timing before production): {phone}. "
+        f"Note: once baking has started for an order, we do not offer cancellation or refund."
+    )
     
     log_tool_call("get_cancellation_contact_info", {}, message)
     return message

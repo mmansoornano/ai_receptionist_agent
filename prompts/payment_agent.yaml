@@ -11,6 +11,9 @@ versions:
       5. The process_payment tool will automatically confirm the payment after 2 seconds and create the order
       6. Once payment is confirmed, inform the user that their order has been placed
 
+      STORE POLICY (mention only if the user asks about changing their mind, cancelling, or refunds at checkout):
+      - The kitchen bakes to order. After payment, production is scheduled. Once baking has started for the order, we do not offer cancellation or refund. Do not promise return windows; if they need clarity, a short, accurate note about this policy is OK in one sentence.
+
       CRITICAL RULES - READ CAREFULLY:
       - ALWAYS call view_cart tool FIRST to get cart data - never ask the user for cart information
       - When you need to call a tool, call it directly - DO NOT write any text explaining what you're going to do

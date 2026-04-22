@@ -21,6 +21,48 @@ from utils.llm_retry import invoke_with_retry
 from utils.error_handler import handle_llm_error
 
 
+def _cart_tool_messages_show_backend_failure(messages: list) -> bool:
+    """True when recent cart/product tool results indicate the backend was unreachable or errored."""
+    cartish = (
+        "add_item_to_cart",
+        "add_items_to_cart_batch",
+        "view_cart",
+        "remove_item_from_cart",
+        "update_cart_quantity",
+        "clear_shopping_cart",
+        "list_all_products",
+    )
+    fail_markers = (
+        "connection refused",
+        "max retries exceeded",
+        "success': false",
+        "success\": false",
+        '"success": false',
+        "failed to establish",
+        "errno 61",
+        "error: http",
+        "error: httpconnectionpool",
+    )
+    for msg in reversed(messages[-12:]):
+        if not isinstance(msg, ToolMessage):
+            continue
+        name = (getattr(msg, "name", None) or "") or ""
+        name = str(name)
+        body_raw = str(msg.content) if msg.content is not None else ""
+        body = body_raw.lower()
+        is_cartish = any(c in name for c in cartish) or (
+            not name.strip()
+            and any(x in body for x in ("/api/cart", "/api/products", "cart_add", "product_list"))
+        )
+        if not is_cartish:
+            continue
+        if any(m in body for m in fail_markers):
+            return True
+        if body_raw.lstrip().lower().startswith("error:") and "http" in body:
+            return True
+    return False
+
+
 def get_max_tokens_for_model():
     """Get appropriate max_tokens limit based on the configured model.
     
@@ -333,6 +375,20 @@ Do not make up, guess, or hallucinate product names or prices. Respond only afte
         ordering_prompt += "\n\nWARNING: No customer_id - using 'anonymous'."
         log_agent_flow("ORDERING", "No customer_id in state", {"using_anonymous": True})
     
+    if _cart_tool_messages_show_backend_failure(messages):
+        log_agent_flow("ORDERING", "Injecting backend-failure reply constraints (tool errors in context)", {})
+        ordering_prompt += """
+
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL — CART / PRODUCT API ERRORS IN TOOL RESULTS (read the ToolMessage(s) above):
+The shop backend or network call failed (connection error, timeout, or success=false).
+- Do NOT claim items were added, do NOT list cart line items, PKR totals, or delivery fees from a cart.
+- Do NOT ask the user to pay or "confirm" a cart you could not read.
+- Reply in 1–3 short sentences: apologize, say the cart or product service is temporarily unavailable, and suggest trying again in a moment (or that the store systems may need to be online).
+- You may acknowledge the product they asked for by name only; do not fabricate a successful add.
+═══════════════════════════════════════════════════════════════════════════════
+"""
+    
     # Log the prompt being used
     log_prompt("ORDERING_AGENT", ordering_prompt, {
         "customer_id": customer_id,
@@ -508,12 +564,15 @@ Do not make up, guess, or hallucinate product names or prices. Respond only afte
             log_agent_flow("ORDERING", "Response has catalog - stripping it", {"response_length": len(response_content)})
             response_content = ""  # Clear it, will be replaced below
         
-        # If we have view_cart result, use it as primary response
-        if view_cart_result:
+        # If we have view_cart result, use it as primary response — but not when this turn
+        # still has pending tool_calls: cart ToolMessages in state are from *previous* turns only
+        # until tools run, and would show a stale cart (wrong qty/total vs about-to-run add/view).
+        pending_tools = bool(getattr(response, "tool_calls", None))
+        if view_cart_result and not (user_adding_items and pending_tools):
             # Format a nice response with cart contents
             cart_response_text = f"I've added the items to your cart.\n\n{view_cart_result}\n\nWould you like to add anything else or proceed with your order?"
             
-            # ALWAYS replace response with cart content when user is adding items
+            # Replace after tools have run (pending_tools is false); user sees current cart only
             response = AIMessage(
                 content=cart_response_text,
                 tool_calls=getattr(response, 'tool_calls', None),
@@ -871,25 +930,55 @@ class OrderingToolNodeWithState:
                     'id': tool_id
                 })
         
-        # Create modified message with updated tool calls if needed
+        # Build state whose last message uses mapped/injected tool calls (always, for correct execution)
+        if isinstance(last_message, AIMessage):
+            message_for_tools = AIMessage(
+                content=last_message.content,
+                tool_calls=modified_tool_calls,
+                id=getattr(last_message, 'id', None)
+            )
+        else:
+            message_for_tools = AIMessage(
+                content=getattr(last_message, 'content', ''),
+                tool_calls=modified_tool_calls
+            )
+        state_for_tools = {**state, "messages": messages[:-1] + [message_for_tools]}
+
+        # LangGraph ToolNode runs multiple tool calls in parallel. If view_cart runs before add_*
+        # finishes, the user sees a stale cart. Run add/* first, then view_cart, in order.
+        _names = [tc.get("name", "") for tc in modified_tool_calls if isinstance(tc, dict)]
+        if not _names and modified_tool_calls:
+            _names = [getattr(tc, "name", "") for tc in modified_tool_calls]
+        _has_add = any(
+            n in ("add_item_to_cart", "add_items_to_cart_batch")
+            for n in _names
+        )
+        _has_view = any(n == "view_cart" for n in _names)
+        if _has_add and _has_view:
+            reordered = [
+                c for c in modified_tool_calls if c.get("name") != "view_cart"
+            ] + [c for c in modified_tool_calls if c.get("name") == "view_cart"]
+            from langchain_core.runnables import RunnableConfig
+
+            out_msgs: list[ToolMessage] = []
+            cfg: RunnableConfig = {}
+            for call in reordered:
+                cname = call.get("name", "")
+                if cname and cname not in self.base_tool_node.tools_by_name:
+                    log_agent_flow("ORDERING", "Skip unknown tool in sequential run", {"name": cname})
+                    continue
+                injected = self.base_tool_node.inject_tool_args(call, state_for_tools, None)
+                out_msgs.append(self.base_tool_node._run_one(injected, "dict", cfg))
+            log_agent_flow(
+                "ORDERING",
+                "Sequential cart tools (add then view) to avoid parallel race",
+                {"returned": len(out_msgs)},
+            )
+            return {"messages": out_msgs}
+
         if modified:
-            # Create a new AIMessage with modified tool calls
-            if isinstance(last_message, AIMessage):
-                modified_message = AIMessage(
-                    content=last_message.content,
-                    tool_calls=modified_tool_calls,
-                    id=getattr(last_message, 'id', None)
-                )
-            else:
-                modified_message = AIMessage(
-                    content=getattr(last_message, 'content', ''),
-                    tool_calls=modified_tool_calls
-                )
-            modified_messages = messages[:-1] + [modified_message]
-            modified_state = {**state, "messages": modified_messages}
-            return self.base_tool_node.invoke(modified_state)
-        
-        # Execute tools using standard ToolNode
+            return self.base_tool_node.invoke(state_for_tools)
+
         return self.base_tool_node.invoke(state)
 
 

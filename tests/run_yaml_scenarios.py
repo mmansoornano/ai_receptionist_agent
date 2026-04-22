@@ -79,7 +79,7 @@ def _kind_for_turn(
 
 
 def run_suite(path: Path, *, output_dir: Path | None = None) -> int:
-    from tests.cache_reset import clear_test_artifacts
+    from tests.cache_reset import clear_in_memory_caches_for_new_scenario, clear_test_artifacts
 
     clear_test_artifacts()
 
@@ -155,11 +155,17 @@ def run_suite(path: Path, *, output_dir: Path | None = None) -> int:
     use_telemetry = (os.environ.get("AGENT_METRICS_TELEMETRY", "").lower() in ("1", "true", "yes"))
 
     for sc in suite.scenarios:
+        # Each scenario must start like a new user: no stale prompts/guard/judge state.
+        clear_in_memory_caches_for_new_scenario()
         slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", f"{suite.name}-{sc.id}").strip("-")[:120]
         thread = sc.thread_id or slug or f"yaml-{sc.id}"[:120]
-        customer = sc.customer_id or suite.defaults.customer_id
+        # Default customer must be unique per scenario or the Django cart carries over between runs.
+        customer = sc.customer_id or f"{suite.defaults.customer_id}-{sc.id}"[:200]
         last: dict[str, Any] | None = None
-        print(f"\n\033[36m━━ scenario\033[0m {sc.id!r}  thread={thread!r}", file=sys.stderr)
+        print(
+            f"\n\033[36m━━ scenario\033[0m {sc.id!r}  thread={thread!r}  customer={customer!r}",
+            file=sys.stderr,
+        )
 
         for tix, turn in enumerate(sc.turns):
             sk = _kind_for_turn(suite.defaults, sc, turn)

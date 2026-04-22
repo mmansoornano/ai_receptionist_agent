@@ -30,6 +30,26 @@ def clear_in_memory_caches() -> None:
         pass
 
 
+def clear_in_memory_caches_for_new_scenario() -> None:
+    """
+    Call before each isolated scenario / graph_thread.reset (not full session reset).
+
+    Same as :func:`clear_in_memory_caches` but no-ops if:
+
+    * ``AGENT_TEST_SKIP_CACHE_RESET=1`` — same as full pytest session clear skip.
+    * ``AGENT_TEST_SKIP_PER_SCENARIO_CACHE_RESET=1`` — only this lighter hook (faster local debug).
+    """
+    if os.environ.get("AGENT_TEST_SKIP_CACHE_RESET", "").lower() in ("1", "true", "yes"):
+        return
+    if os.environ.get("AGENT_TEST_SKIP_PER_SCENARIO_CACHE_RESET", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return
+    clear_in_memory_caches()
+
+
 def clear_disk_caches_for_tests() -> None:
     """FAISS index dir, log files, pytest cache dir (same as scripts/clear_local_state, without --pycache)."""
     vs = _ROOT / "data" / "vectorstore"
