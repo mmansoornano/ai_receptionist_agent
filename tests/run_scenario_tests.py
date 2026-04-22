@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""Run scenario integration tests with readable banners and LLM auto-pick (Ollama first, else OpenAI).
-
-By default, pytest uses ``--capture=tee-sys`` and live ``log_cli`` so agent and library logs
-stream during each test (not only after failure). Use ``--no-live-logs`` for buffered CI-style output.
-
-Examples:
-  python tests/run_scenario_tests.py                 # all scenario suites under tests/integration/
-  python tests/run_scenario_tests.py conversation
-  python tests/run_scenario_tests.py ordering
-  python tests/run_scenario_tests.py payment
-  python tests/run_scenario_tests.py cancellation
-  python tests/run_scenario_tests.py security
-  python tests/run_scenario_tests.py flows         # conversation + ordering + payment + cancellation
-  python tests/run_scenario_tests.py list          # print suite names
-  python tests/run_scenario_tests.py --no-live-logs conversation  # buffered capture (CI-style)
-"""
+"""Run LLM scenario tests under tests/integration/ (see project README → Testing)."""
 from __future__ import annotations
 
 import argparse
