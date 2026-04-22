@@ -3,9 +3,32 @@ layout: default
 title: Testing
 ---
 
+## Simple guide (start here)
+
+This project has two **layers** of automated checks:
+
+1. **Quick tests** — Run in seconds. They use **mocked** services where possible. You do **not** need a live AI (Ollama/OpenAI) for most of them. This is the **default** when you type `pytest`.
+2. **Full / chat tests** — These drive the **real AI assistant** and are marked **“integration”**. They take longer and need **Ollama** or an **OpenAI API key** in your **`.env`**.
+
+**If you are not a developer:** ask whoever set up the project to run the “full” command on their machine, or use your team’s CI page. The commands below are safe to copy; you only need a terminal open in the project folder.
+
+| What you want | Plain English | Command (from the `AI_receptionist_agent` folder) |
+|----------------|---------------|---------------------------------------------------|
+| **Check the basics only** (fast) | The usual “did we break something simple?” run | `python -m pytest` |
+| **Run *every* automated test** (quick + full chat tests, one after the other) | **Everything** the project can run in pytest | `python -m pytest --override-ini "addopts=-q" tests --ignore=tests/manual_test.py` |
+| **Only the AI / chat tests** (no quick-only tests) | “Just the big, slow, realistic tests” | `python -m pytest tests/integration -m integration` |
+| **A menu of story-style tests** (greeting, cart, payment, …) | Helper script; same idea as a subset of integration | `python tests/run_scenario_tests.py` |
+
+**Why is “run everything” a long command?**  
+The file **`pytest.ini`** is set up so a normal `pytest` run **skips** the long AI tests. That keeps daily checks fast. To **include** those tests, the command must **turn off** that skip — that is what **`--override-ini "addopts=-q"`** does (it leaves only “quiet” on, and runs all markers).
+
+**Optional script:** `python tests/run_all_tests.py` runs the **default** (fast) suite. `python tests/run_all_tests.py --integration` runs **only** integration tests — **not** “fast + slow” in one go. For **true** “all tests in one command”, use the long **`--override-ini`** line in the table above.
+
+---
+
 ## Where to run
 
-All commands assume the repository root **`AI_receptionist_agent/`** (where **`pytest.ini`** and **`.env`** live). Create **`.env`** from **`.env.example`** before scenario or integration runs.
+All commands assume the repository root **`AI_receptionist_agent/`** (the folder that contains **`pytest.ini`** and **`.env`**). If you are new: open a terminal, **`cd`** into that folder, then paste a command. Create **`.env`** from **`.env.example`** before you run any test that needs the **LLM** or the **real backend API**.
 
 ## Clear local cache, logs, and in-memory thread state
 
@@ -33,16 +56,19 @@ Use the form below to pick what you want to exercise; it fills in a **copy-ready
 
 {% include test-command-builder.html %}
 
-## Quick commands
+## Quick commands (reference)
 
-| Goal | Prerequisites | Command |
-|------|-----------------|---------|
-| **Fast suite (default)** | `pip install -r requirements.txt` | `python -m pytest` or `python tests/run_all_tests.py` |
-| **LLM scenario suites** | Ollama **or** `OPENAI_API_KEY` in `.env` | `python tests/run_scenario_tests.py` or `python tests/run_scenario_tests.py conversation` |
-| **YAML chat scenarios (no pytest)** | Same env + judge as integration tests | `python tests/run_yaml_scenarios.py` or `python tests/run_yaml_scenarios.py path/to/suite.yml` |
-| **Live Django HTTP tools** | Backend up; `BACKEND_API_BASE_URL` reachable | `python -m pytest -m integration tests/test_backend_integration.py` |
+| Goal | What you need first | Command |
+|------|---------------------|---------|
+| **Fast checks (default)** | Python dependencies installed (`pip install -r requirements.txt`) | `python -m pytest` **or** `python tests/run_all_tests.py` *(same default: skips long “integration” tests)* |
+| **Every pytest test in one go** | As above, **plus** working LLM for integration tests | `python -m pytest --override-ini "addopts=-q" tests --ignore=tests/manual_test.py` |
+| **Only integration / chat tests** | Ollama **or** `OPENAI_API_KEY` in `.env` | `python -m pytest tests/integration -m integration` **or** `python tests/run_all_tests.py --integration` |
+| **Story groups** (conversation, cart, payment, …) | Same as integration | `python tests/run_scenario_tests.py` *(see **Scenario runner** below)* |
+| **YAML file of chats (not pytest)** | Same env as integration; optional judge | `python tests/run_yaml_scenarios.py` or `python tests/run_yaml_scenarios.py tests/scenarios/example_scenarios.yml` |
+| **Django API smoke test** | Backend running; `BACKEND_API_BASE_URL` set | `python -m pytest -m integration tests/test_backend_integration.py` |
 
-**`pytest.ini`** sets **`addopts = -m "not integration"`**, so a plain **`pytest`** run skips integration-marked tests (LLM + live backend). That keeps CI and local checks fast.
+**Why two kinds of “test”?**  
+**`pytest.ini`** tells the default command to use **`-m "not integration"`**. So **`python -m pytest`** = “everything **except** the long AI tests.” To run **all** tests, you must use the **override** command in the table, or run **two** commands (fast, then integration).
 
 ## Pytest markers (`pytest.ini`)
 

@@ -171,14 +171,18 @@ Use **`.env`** in this folder (see **Installation**). Common keys: **`LLM_PROVID
 
 Run commands from **`AI_receptionist_agent/`** (where `pytest.ini` and `.env` live). Scenario tests load **`.env`** automatically; put **`OPENAI_API_KEY`** there if you use OpenAI or Ollama-off fallback.
 
+**Plain-English summary:** A normal `pytest` run is the **fast** suite only. To run **every** automated test (fast + AI) in **one** command, use the **“All pytest tests”** line below. Full detail: [`docs/testing.md`](docs/testing.md).
+
 | What | Needs | Command |
 |------|--------|---------|
 | **Fast (default) tests** | Python + deps | `python -m pytest` or `python tests/run_all_tests.py` |
-| **LLM scenarios** | Ollama **or** `OPENAI_API_KEY` in `.env` | `python tests/run_scenario_tests.py [<suite>]` |
+| **All pytest tests** (fast + integration) | LLM for integration + same deps | `python -m pytest --override-ini "addopts=-q" tests --ignore=tests/manual_test.py` |
+| **Integration only** (AI / chat tests) | Ollama **or** `OPENAI_API_KEY` | `python tests/run_all_tests.py --integration` **or** `python -m pytest tests/integration -m integration` |
+| **LLM scenarios** (grouped stories) | Same as integration | `python tests/run_scenario_tests.py [<suite>]` |
 | **YAML scenarios** | Same + judge LLM | `python tests/run_yaml_scenarios.py [tests/scenarios/your.yml]` — see `tests/scenarios/README.md` |
 | **Live Django API** | Backend up + env | `python -m pytest -m integration tests/test_backend_integration.py` |
 
-`pytest.ini` defaults to **`-m "not integration"`**, so plain `pytest` does not run LLM or live-backend integration tests.
+`pytest.ini` defaults to **`-m "not integration"`**, so plain `pytest` does not run LLM or live-backend integration tests. **`run_all_tests.py`** without flags matches that default; **`--integration`** runs **only** integration tests, not “all” tests in one go.
 
 ### LLM scenarios (`tests/integration/`)
 
