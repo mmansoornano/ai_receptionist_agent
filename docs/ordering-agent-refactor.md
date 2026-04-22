@@ -1,19 +1,14 @@
 ---
 layout: default
-title: Ordering agent refactor
-permalink: /ordering-agent-refactor.html
+title: Ordering refactor
 ---
 
-# Ordering agent module split (deferred)
+## Status: deferred
 
-`graph/ordering_agent.py` is large (ordering logic, tools, message shaping).
+`graph/ordering_agent.py` is intentionally large today: it mixes prompt construction, catalog handling, tool orchestration, and LangGraph **`Command`** routing.
 
-## Planned direction
+## Planned refactor (no behavior change)
 
-Split **without behavior change** into smaller modules (prompt assembly, tool normalization, graph wiring).
+Split into smaller modules (e.g. prompt builders, cart message normalizers, tool wiring) once API and docs stabilize. Track with issues labeled **`refactor/ordering`**.
 
-## Status
-
-Deferred; track with issues/PRs labeled `refactor/ordering`.
-
-[← Home]({{ "/" | relative_url }})
+This does not block shipping demos—the runtime behavior and tests are the source of truth.

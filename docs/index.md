@@ -3,19 +3,28 @@ layout: default
 title: Home
 ---
 
-# AI Receptionist Agent
+This repository is the **AI Receptionist agent service**: a **FastAPI** app that runs a **LangGraph** graph for natural-language conversations. It classifies intent, calls specialist agents (QA, ordering, payment, cancellation), executes **tools** (HTTP to your Django API, RAG over a local vector store, calculators), and returns assistant replies. It supports **Ollama** and **OpenAI** via configuration.
 
-This **repository** is only the **agent service**: FastAPI HTTP API + **LangGraph** multi-agent orchestration (router, QA, ordering, payment, cancellation), tools, and LLM integration (Ollama / OpenAI).
+<div class="doc-cards">
+  <a class="doc-card" href="{% link architecture.md %}"><strong>Architecture</strong><span>What the service does, stack, and repo layout</span></a>
+  <a class="doc-card" href="{% link graph.md %}"><strong>LangGraph</strong><span>Nodes, routing, state, and tool loop</span></a>
+  <a class="doc-card" href="{% link api.md %}"><strong>HTTP API</strong><span><code>/process</code>, health checks, limits</span></a>
+  <a class="doc-card" href="{% link integration.md %}"><strong>Integration</strong><span>Backend + frontend repos and env vars</span></a>
+  <a class="doc-card" href="{% link security.md %}"><strong>Security</strong><span>CORS, PII logging, secrets</span></a>
+  <a class="doc-card" href="{% link dependencies.md %}"><strong>Dependencies</strong><span>Install and optional lock file</span></a>
+</div>
 
-## Documentation pages
+## Capabilities
 
-- [What this service does]({{ "/architecture.html" | relative_url }})
-- [Integrating with backend and frontend repos]({{ "/integration.html" | relative_url }})
-- [Security, CORS, logging]({{ "/security.html" | relative_url }})
-- [Dependencies and reproducible installs]({{ "/dependencies.html" | relative_url }})
-- [Ordering agent refactor (deferred)]({{ "/ordering-agent-refactor.html" | relative_url }})
-- [Publish these docs on GitHub Pages]({{ "/github-pages.html" | relative_url }})
+| Area | Details |
+|------|---------|
+| **Routing** | `graph/router.py` — LLM classification + rules (e.g. add-to-cart, checkout phrases) → intent + target agent or direct greeting reply |
+| **QA** | `graph/qa_agent.py` — RAG, calendar, customer lookup, product list, calculators |
+| **Ordering** | `graph/ordering_agent.py` — cart tools, catalog, payment handoff |
+| **Payment / cancellation** | Dedicated agents + tool nodes |
+| **State** | LangGraph checkpointer (`MemorySaver`) keyed by thread id from `main.py` |
+| **Tests** | Pytest: fast mocks + `tests/integration` LLM scenarios — see root **README.md** |
 
-## Runbook
+## Runbook in code
 
-API, env vars, and tests are documented in the repository root **`README.md`** (same repo as this `docs/` folder).
+Clone this repo only, create **`.env`** from **`.env.example`**, install **`requirements.txt`**, then `python api_server.py` or `python main.py`. Full commands and markers live in the repository **README.md** (not duplicated here so a single source stays accurate).

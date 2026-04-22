@@ -1,22 +1,21 @@
 ---
 layout: default
-title: Security and logging
-permalink: /security.html
+title: Security
 ---
-
-# Security and logging (agent service)
 
 ## PII in logs (`main.py`)
 
-At **INFO**, phone / `conversation_id` / `customer_id` are **masked**; long user or assistant text is **preview-truncated** unless **`AGENT_LOG_PII=1`** is set (local debugging only).
+By default, **INFO** logs **mask** phone / `conversation_id` / `customer_id` and **truncate** long user or assistant text previews. Set **`AGENT_LOG_PII=1`** only on trusted machines when you need full values for debugging.
 
-## HTTP API (`api_server.py`)
+## HTTP surface (`api_server.py`)
 
-- **`POST /process`**: message length cap; **503** only if `process_message` raises an unexpected exception (most graph failures still return a friendly string with **200** — see README).
-- **`CORS_ORIGINS`**: comma-separated list. If unset, wildcard origin is used **without** credentials.
+- **`POST /process`** — payload size limits on fields; **503** only on uncaught exceptions (see [HTTP API]({% link api.md %})).
+- **CORS** — explicit origins via **`CORS_ORIGINS`** recommended for public demos.
 
 ## Secrets
 
-Use **`.env.example`** as a template; never commit `.env` or API keys.
+Never commit **`.env`**. Use **`.env.example`** as the template. Rotate keys if a demo repo was ever public with real credentials.
 
-[← Home]({{ "/" | relative_url }})
+## Prompt injection
+
+Scenario tests under **`tests/integration/`** include abuse-style prompts; run them when you change router or tool prompts. They are not a guarantee of safety in adversarial settings—layer policy + rate limits at the edge for production.

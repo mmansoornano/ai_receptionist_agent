@@ -1,11 +1,12 @@
 # GitHub Pages: Settings → Pages → Branch main, folder /docs
-theme: jekyll-theme-minimal
+# If links 404, set baseurl to "/<your-repo-slug>" (project site path).
 title: AI Receptionist Agent
-description: LangGraph + FastAPI agent service documentation
+description: FastAPI + LangGraph — intent routing, tools, Ollama/OpenAI, RAG, backend integration
 
-# Project Pages URL is https://<user>.github.io/<THIS_REPO_NAME>/
-# Set baseurl to "/<THIS_REPO_NAME>" (leading slash, no trailing slash).
-baseurl: ""
-url: ""
+baseurl: "/ai_receptionist_agent"
+url: "https://mmansoornano.github.io"
+
+# GitHub "owner/name" for header/footer links (edit when you fork).
+github_repo: mmansoornano/ai_receptionist_agent
 
 markdown: kramdown
