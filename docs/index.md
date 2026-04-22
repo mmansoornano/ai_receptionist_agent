@@ -14,6 +14,7 @@ This repository is the **AI Receptionist agent service**: a **FastAPI** app that
   <a class="doc-card" href="{{ site.canonical_docs_url }}/integration.html"><strong>Integration</strong><span>Backend + frontend repos and env vars</span></a>
   <a class="doc-card" href="{{ site.canonical_docs_url }}/security.html"><strong>Security</strong><span>CORS, PII logging, secrets</span></a>
   <a class="doc-card" href="{{ site.canonical_docs_url }}/dependencies.html"><strong>Dependencies</strong><span>Install and optional lock file</span></a>
+  <a class="doc-card" href="{{ site.canonical_docs_url }}/testing.html"><strong>Testing</strong><span>pytest, markers, LLM scenarios, live backend</span></a>
 </div>
 
 ## Capabilities
@@ -25,7 +26,7 @@ This repository is the **AI Receptionist agent service**: a **FastAPI** app that
 | **Ordering** | `graph/ordering_agent.py` — cart tools, catalog, payment handoff |
 | **Payment / cancellation** | Dedicated agents + tool nodes |
 | **State** | LangGraph checkpointer (`MemorySaver`) keyed by thread id from `main.py` |
-| **Tests** | Pytest: fast mocks + `tests/integration` LLM scenarios — see root **README.md** |
+| **Tests** | [Testing]({{ site.canonical_docs_url }}/testing.html) — pytest defaults, markers, scenario runner, live Django integration |
 
 ## Runbook in code
 
