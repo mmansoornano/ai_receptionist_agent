@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from pytest import CaptureFixture
 
 _AGENT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_AGENT_ROOT) not in sys.path:
@@ -29,32 +30,72 @@ from tests.llm_test_utils import (
 )
 
 
-def _emit_scenario_line(user_text: str, result: dict[str, Any], elapsed: float, out_text: str) -> None:
-    """Stderr: full user message, arrow routing (intent / handoff), latency, full assistant reply."""
+def _emit_scenario_turn_box(user_text: str, result: dict[str, Any], elapsed: float, out_text: str) -> None:
+    """Print one turn summary to the real terminal (bypasses pytest capture). No prompts or agent logs."""
     intent = result.get("intent")
     agent = result.get("active_agent")
     dest = agent if agent else "__end__"
     dim, bold, reset = "\033[2m", "\033[1m", "\033[0m"
-    muted, path_c = "\033[90m", "\033[36m"
-    arrow = f"{muted} -->{reset}"
-    reply = (out_text or "").rstrip("\n")
-    if not reply:
-        reply = "(empty)"
-    sys.stderr.write(f"{dim}{'─' * 56}{reset}\n")
-    sys.stderr.write(f"{bold}you{reset}\n{user_text}\n")
-    sys.stderr.write(
-        f"{path_c}router{reset} {arrow} intent={intent!r} {arrow} {dest!r}  {dim}({elapsed:.2f}s){reset}\n"
-    )
-    sys.stderr.write(f"{bold}assistant{reset}\n{reply}\n")
+    cyan = "\033[36m"
+    reply = (out_text or "").rstrip("\n") or "(empty)"
+    router_line = f"intent={intent!r}  →  {dest!r}"
+    w = 64
+    top = dim + "┌" + "─" * w + "┐" + reset
+    mid = dim + "├" + "─" * w + "┤" + reset
+    bot = dim + "└" + "─" * w + "┘" + reset
+
+    def flush_block(title_plain: str, body: str) -> None:
+        sys.stderr.write(f"│ {cyan}{bold}{title_plain}{reset}\n")
+        for ln in body.split("\n") or [""]:
+            sys.stderr.write(f"│   {ln}\n")
+
+    sys.stderr.write(f"\n{top}\n")
+    flush_block("USER INPUT", user_text.rstrip("\n"))
+    sys.stderr.write(f"{mid}\n")
+    flush_block("ROUTER", router_line)
+    sys.stderr.write(f"{mid}\n")
+    flush_block("TIME", f"{elapsed:.2f}s")
+    sys.stderr.write(f"{mid}\n")
+    flush_block("AGENT OUTPUT", reply)
+    sys.stderr.write(f"{bot}\n\n")
+
+
+def _print_turn_box_visible(
+    config: pytest.Config, capsys: CaptureFixture[str], emit: Callable[[], None]
+) -> None:
+    """Show the turn box on the real TTY. ``capsys.disabled()`` alone can miss fd capture; suspend capturemanager too."""
+    capman = None
+    pm = config.pluginmanager
+    _get = getattr(pm, "get_plugin", None) or getattr(pm, "getplugin", None)
+    if _get is not None:
+        try:
+            capman = _get("capturemanager")
+        except LookupError:
+            capman = None
+    if capman is not None:
+        suspend = getattr(capman, "suspend_global_capture", None)
+        resume = getattr(capman, "resume_global_capture", None)
+        if callable(suspend) and callable(resume):
+            suspend(in_=True)
+            try:
+                emit()
+                sys.stderr.flush()
+            finally:
+                resume()
+            return
+    with capsys.disabled():
+        emit()
+    sys.stderr.flush()
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Stream stdout live during integration runs (agent logger writes to stdout)."""
+    """Optional live tee of stdout; off by default so agent logs stay hidden unless a test fails."""
+    if os.environ.get("AGENT_SCENARIO_LIVE_LOGS", "").lower() not in ("1", "true", "yes"):
+        return
     try:
         cap = config.getoption("--capture")
     except (ValueError, AttributeError):
         return
-    # Respect explicit -s / --capture=no
     if cap in ("fd", "sys"):
         config.option.capture = "tee-sys"
 
@@ -103,7 +144,7 @@ def pytest_collection_finish(session: pytest.Session) -> None:
 def pytest_sessionstart(session: pytest.Session) -> None:
     if getattr(session.config, "_scenario_integration_hooks", False):
         session.config._scenario_suite_start = time.perf_counter()
-        # stdout: only WARNING+ from agent logger; stderr turn blocks show user/reply/arrows/time.
+        # Console: agent INFO suppressed. Each turn prints a box (capturemanager suspend + capsys fallback).
         if os.getenv("AGENT_LOG_FULL_PROMPTS", "").lower() not in ("1", "true", "yes"):
             from utils.logger import apply_scenario_trace_logging
 
@@ -182,7 +223,7 @@ def receptionist_graph():
 
 
 @pytest.fixture
-def invoke_graph(receptionist_graph) -> Callable[..., dict[str, Any]]:
+def invoke_graph(receptionist_graph, capsys, request) -> Callable[..., dict[str, Any]]:
     """Single-turn invoke: (user_text, *, thread_id=..., customer_id=...) -> result dict."""
 
     def _invoke(
@@ -206,7 +247,11 @@ def invoke_graph(receptionist_graph) -> Callable[..., dict[str, Any]]:
             raise
         elapsed = time.perf_counter() - t0
         out_text = last_assistant_text(result.get("messages"))
-        _emit_scenario_line(user_text, result, elapsed, out_text)
+
+        def _emit() -> None:
+            _emit_scenario_turn_box(user_text, result, elapsed, out_text)
+
+        _print_turn_box_visible(request.config, capsys, _emit)
         return result
 
     return _invoke
@@ -225,7 +270,7 @@ def reply_text(invoke_graph) -> Callable[[str], str]:
 
 
 @pytest.fixture
-def graph_thread(receptionist_graph):
+def graph_thread(receptionist_graph, capsys, request):
     """Multi-turn helper: call ``reset()`` before a test for an isolated thread."""
 
     class _T:
@@ -233,6 +278,7 @@ def graph_thread(receptionist_graph):
             self._n = 0
             self.thread_id = "mt-0"
             self._last: dict[str, Any] | None = None
+            self._request = request
 
         def reset(self) -> None:
             self._n += 1
@@ -258,7 +304,11 @@ def graph_thread(receptionist_graph):
                 raise
             elapsed = time.perf_counter() - t0
             out_text = last_assistant_text(self._last.get("messages"))
-            _emit_scenario_line(user_text, self._last, elapsed, out_text)
+
+            def _emit() -> None:
+                _emit_scenario_turn_box(user_text, self._last, elapsed, out_text)
+
+            _print_turn_box_visible(self._request.config, capsys, _emit)
             return out_text
 
     return _T()

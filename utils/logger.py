@@ -14,7 +14,7 @@ def _minimal_test_logs() -> bool:
 
 
 # Set by ``tests/integration/conftest.py`` sessionstart: console shows only warnings/errors;
-# turn summaries go to stderr from the test harness (user message, arrows, reply, latency).
+# Turn summaries: integration conftest prints a framed box (user, router, time, reply) via capsys.disabled().
 _SCENARIO_TRACE_MODE = False
 
 

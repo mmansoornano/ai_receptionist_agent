@@ -187,7 +187,7 @@ python tests/run_scenario_tests.py              # all suites
 python tests/run_scenario_tests.py conversation   # swap suite: ordering, payment, cancellation, security
 python tests/run_scenario_tests.py flows        # all except security
 python tests/run_scenario_tests.py list         # suite names
-python tests/run_scenario_tests.py --no-live-logs conversation  # buffered logs
+python tests/run_scenario_tests.py --live-logs conversation  # optional: stream WARNING+ logs (noisy)
 ```
 
 **Provider selection (tests):** `tests/llm_env_select.py` — if `LLM_PROVIDER` is unset or `ollama`, probes Ollama; if down and **`OPENAI_API_KEY`** is set, switches to OpenAI for that run. If `LLM_PROVIDER=openai`, a key is required. No LLM → exit **2** after collection. The **running app** (`config.py`) does **not** auto-fallback; only tests do.
@@ -198,7 +198,7 @@ python tests/run_scenario_tests.py --no-live-logs conversation  # buffered logs
 
 **One test:** `python -m pytest tests/integration/test_conversation_scenarios.py::test_greeting_gets_friendly_reply -m "integration and conversation" -v --tb=line`
 
-**Output:** stderr shows each turn (user text, `router → intent → node`, time, assistant reply). Prompts stay in **`logs/agent.log`** (DEBUG). **`AGENT_LOG_FULL_PROMPTS=1`** restores verbose console prompts.
+**Output (default):** each passing turn prints a **boxed summary** to your terminal (user input, router intent and destination, time in seconds, agent reply) — the same whether you use **`run_scenario_tests.py`** or **`python -m pytest tests/integration …`**. The harness **suspends pytest’s capture** for that print so the box is visible under default **fd** capture. **Agent logs and prompts are not streamed** while tests pass; they stay in **`logs/agent.log`** (DEBUG). If a test **fails**, pytest prints captured output and you get a tip to open the log file; use **`AGENT_LOG_FULL_PROMPTS=1`** only when you need full prompts on the console. Pass **`--live-logs`** to `run_scenario_tests.py` to restore live WARNING+ log streaming (old behavior).
 
 **`--collect-only`:** lists tests only; no LLM calls.
 

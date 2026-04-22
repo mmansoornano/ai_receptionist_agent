@@ -40,7 +40,7 @@ This service is the **conversational orchestration layer**. It does **not** own 
 | `tools/` | LangChain tools hitting REST APIs, DB helpers, RAG | <code>tests/test_backend_integration.py</code> (live Django at <code>BACKEND_API_BASE_URL</code>); service unit tests (e.g. cart, payment) |
 | `services/` | LLM provider, HTTP clients, RAG, prompts | Mocked in fast unit tests; live LLM in marked integration tests |
 | `utils/` | Logging, retries, message filtering, conversation formatting | <code>tests/test_message_utils_unit.py</code>, <code>tests/test_conversation_history_unit.py</code> |
-| `tests/` | Unit + integration (`tests/integration` needs LLM) | Run <code>pytest</code> from repo root; see root <strong>README.md</strong> for markers and env |
+| `tests/` | Unit + integration (`tests/integration` needs LLM) | [Testing]({{ site.canonical_docs_url }}/testing.html) page + root **README.md** — markers, turn boxes, <code>run_scenario_tests.py</code>, env |
 
 ## Intents (router)
 

@@ -56,9 +56,9 @@ def main() -> int:
     )
     parser.add_argument("-q", "--quiet", action="store_true", help="Less pytest output (-q)")
     parser.add_argument(
-        "--no-live-logs",
+        "--live-logs",
         action="store_true",
-        help="Use default pytest capture (logs only after failure). Default is live stream.",
+        help="Stream WARNING+ logs to the terminal (noisy). Default: capture everything; failures show dumps.",
     )
     args = parser.parse_args()
 
@@ -77,7 +77,7 @@ def main() -> int:
 
     env = os.environ.copy()
     env["AGENT_SCENARIO_RUN"] = "1"
-    env.setdefault("AGENT_SCENARIO_TRACE", "1")
+    env["AGENT_SCENARIO_LIVE_LOGS"] = "1" if args.live_logs else "0"
     env.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
     env.setdefault("OMP_NUM_THREADS", "1")
     env.setdefault("AGENT_TEST_MINIMAL_LOGS", "1")
@@ -91,9 +91,7 @@ def main() -> int:
         "--tb=line",
         "--color=yes",
     ]
-    # Agent logs use logging → stdout; tee-sys streams while still capturing for failures.
-    if not args.no_live_logs:
-        # httpx / faiss loader chatter → keep WARNING; agent logger has its own handler at INFO.
+    if args.live_logs:
         pytest_cmd.extend(
             [
                 "--capture=tee-sys",

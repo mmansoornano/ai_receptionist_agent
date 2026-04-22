@@ -16,19 +16,8 @@ def run_tests(run_integration: bool = False) -> int:
         env.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
         env.setdefault("OMP_NUM_THREADS", "1")
         env.setdefault("AGENT_TEST_MINIMAL_LOGS", "1")
-        cmd.extend(
-            [
-                "-m",
-                "integration",
-                "--capture=tee-sys",
-                "-o",
-                "log_cli=true",
-                "-o",
-                "log_cli_level=WARNING",
-                "-o",
-                "log_cli_format=%(asctime)s %(levelname)s [%(name)s] %(message)s",
-            ]
-        )
+        env.setdefault("AGENT_SCENARIO_LIVE_LOGS", "0")
+        cmd.extend(["-m", "integration"])
     print("Running:", " ".join(cmd), f"(cwd={_AGENT_ROOT})")
     proc = subprocess.run(cmd, cwd=str(_AGENT_ROOT), env=env if run_integration else None)
     return int(proc.returncode)
