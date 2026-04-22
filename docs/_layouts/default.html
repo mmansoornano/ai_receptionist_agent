@@ -10,15 +10,16 @@
 <body>
   <header class="site-header">
     <div class="site-header-inner">
-      <a class="brand brand-home" href="{{ site.canonical_docs_url }}/index.html">
+      <div class="brand">
         <span class="brand-mark" aria-hidden="true"></span>
         <div>
           <p class="brand-eyebrow">Conversational AI</p>
           <h1 class="brand-title">{{ site.title }}</h1>
           <p class="brand-desc">{{ site.description }}</p>
         </div>
-      </a>
+      </div>
       <nav class="site-nav" aria-label="Documentation">
+        <a href="{{ site.canonical_docs_url }}/">Home</a>
         <a href="{{ site.canonical_docs_url }}/architecture.html">Architecture</a>
         <a href="{{ site.canonical_docs_url }}/api.html">HTTP API</a>
         <a href="{{ site.canonical_docs_url }}/graph.html">LangGraph</a>

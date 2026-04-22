@@ -40,16 +40,6 @@ body {
 
 .brand { display: flex; gap: 1rem; align-items: flex-start; }
 
-a.brand.brand-home {
-  text-decoration: none;
-  color: inherit;
-}
-
-a.brand.brand-home:hover .brand-title {
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
 .brand-mark {
   width: 3rem;
   height: 3rem;
